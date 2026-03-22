@@ -1,14 +1,28 @@
-export const usuariosMock = [
-  { id: 1, nombre: 'Carlos Pérez',    rol: 'Admin',    estado: 'Activo',    email: 'carlos@taller.com' },
-  { id: 2, nombre: 'Juan Quispe',     rol: 'Mecánico', estado: 'Activo',    email: 'juan@taller.com' },
-  { id: 3, nombre: 'Luis Torres',     rol: 'Mecánico', estado: 'Inactivo',  email: 'luis@taller.com' },
-  { id: 4, nombre: 'Ana Flores',      rol: 'Recepción',estado: 'Activo',    email: 'ana@taller.com' },
-  { id: 5, nombre: 'Pedro Mamani',    rol: 'Mecánico', estado: 'Activo',    email: 'pedro@taller.com' },
+export const talleresMock = [
+  { id: 1, nombre: 'Taller 1' },
+  { id: 2, nombre: 'Taller 2' },
+  { id: 3, nombre: 'Taller 3' },
 ]
 
-export const statsMock = {
-  totalUsuarios: 5,
-  trabajosHoy: 8,
-  vehiculosEnTaller: 3,
-  ingresosMes: 'S/ 12,400',
+export const usuariosMock = [
+  // Taller 1
+  { id: 1,  nombre: 'Carlos Pérez',   email: 'carlos@taller.com',  rol: 'Admin',          estado: 'Activo',   tallerId: null },
+  { id: 2,  nombre: 'Juan Quispe',    email: 'juan@taller.com',    rol: 'Jefe Mecánico',  estado: 'Activo',   tallerId: 1 },
+  { id: 3,  nombre: 'Luis Torres',    email: 'luis@taller.com',    rol: 'Mecánico',       estado: 'Inactivo', tallerId: 1 },
+  { id: 4,  nombre: 'Ana Flores',     email: 'ana@taller.com',     rol: 'Mecánico',       estado: 'Activo',   tallerId: 1 },
+  // Taller 2
+  { id: 5,  nombre: 'Pedro Mamani',   email: 'pedro@taller.com',   rol: 'Jefe Mecánico',  estado: 'Activo',   tallerId: 2 },
+  { id: 6,  nombre: 'Rosa Huanca',    email: 'rosa@taller.com',    rol: 'Mecánico',       estado: 'Activo',   tallerId: 2 },
+  { id: 7,  nombre: 'Miguel Soto',    email: 'miguel@taller.com',  rol: 'Mecánico',       estado: 'Activo',   tallerId: 2 },
+  // Taller 3
+  { id: 8,  nombre: 'Elena Vargas',   email: 'elena@taller.com',   rol: 'Jefe Mecánico',  estado: 'Activo',   tallerId: 3 },
+  { id: 9,  nombre: 'Diego Castro',   email: 'diego@taller.com',   rol: 'Mecánico',       estado: 'Activo',   tallerId: 3 },
+  { id: 10, nombre: 'Sofia Mendoza',  email: 'sofia@taller.com',   rol: 'Mecánico',       estado: 'Inactivo', tallerId: 3 },
+]
+
+// Usuario logueado mock (Admin ve todo, Jefe solo su taller)
+export const usuarioLogueado = {
+  nombre: 'Carlos Pérez',
+  rol: 'Admin',
+  tallerId: null, // null = ve todos
 }
