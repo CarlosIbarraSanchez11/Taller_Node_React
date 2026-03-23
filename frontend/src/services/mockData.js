@@ -83,6 +83,104 @@ export const configuracionRentabilidadMock = {
   utilidad: 30,
 };
 
+/* ─── CONFIGURACIÓN DE VEHÍCULOS ─── */
+export const TIPOS_VEHICULO = ['Auto', 'SUV', 'Camioneta', 'Moto', 'Camión', 'Furgoneta'];
+export const COMBUSTIBLES   = ['Gasolina', 'Diésel', 'Híbrido', 'Eléctrico', 'GLP', 'GNV'];
+
+/* ─── BASE DE DATOS DE CLIENTES ─── */
+export const clientesMock = [
+  {
+    id: 1,
+    nombre: 'Carlos Ibarra Sanchez',
+    dni: '72317018',
+    telefono: '921872052',
+    email: 'carlosmanuelibarra11@gmail.com',
+    vehiculo: { placa: 'AAA-111', marca: 'Hyundai', modelo: 'Tucson', anio: 2021, color: 'Gris Plata', combustible: 'Gasolina', tipo: 'SUV' },
+    tieneCita: true,
+  },
+  {
+    id: 2,
+    nombre: 'Juan Pérez García',
+    dni: '45678901',
+    telefono: '987654321',
+    email: 'juan.perez@gmail.com',
+    vehiculo: { placa: 'BBB-222', marca: 'Toyota', modelo: 'Corolla', anio: 2022, color: 'Blanco', combustible: 'Gasolina', tipo: 'Auto' },
+    tieneCita: false,
+  },
+  {
+    id: 3,
+    nombre: 'María López Quispe',
+    dni: '31245678',
+    telefono: '912345678',
+    email: 'maria.lopez@hotmail.com',
+    vehiculo: { placa: 'CCC-333', marca: 'Kia', modelo: 'Sportage', anio: 2020, color: 'Negro', combustible: 'Gasolina', tipo: 'SUV' },
+    tieneCita: true,
+  },
+  {
+    id: 4,
+    nombre: 'Pedro Mamani Torres',
+    dni: '60123456',
+    telefono: '943210987',
+    email: '',
+    vehiculo: { placa: 'DDD-444', marca: 'Nissan', modelo: 'Frontier', anio: 2019, color: 'Plateado', combustible: 'Diésel', tipo: 'Camioneta' },
+    tieneCita: false,
+  },
+  {
+    id: 5,
+    nombre: 'Rosa Huanca Flores',
+    dni: '52349871',
+    telefono: '956781234',
+    email: 'rosa.huanca@gmail.com',
+    vehiculo: { placa: 'EEE-555', marca: 'Honda', modelo: 'Civic', anio: 2023, color: 'Azul', combustible: 'Gasolina', tipo: 'Auto' },
+    tieneCita: false,
+  },
+  {
+    id: 6,
+    nombre: 'Luis Torres Vargas',
+    dni: '41239870',
+    telefono: '934567890',
+    email: 'luis.torres@empresa.com',
+    vehiculo: { placa: 'FFF-666', marca: 'Chevrolet', modelo: 'D-Max', anio: 2018, color: 'Rojo', combustible: 'Diésel', tipo: 'Camioneta' },
+    tieneCita: true,
+  },
+  {
+    id: 7,
+    nombre: 'Ana Flores Mendoza',
+    dni: '70234561',
+    telefono: '976543210',
+    email: 'ana.flores@gmail.com',
+    vehiculo: { placa: 'GGG-777', marca: 'Suzuki', modelo: 'Swift', anio: 2021, color: 'Amarillo', combustible: 'Gasolina', tipo: 'Auto' },
+    tieneCita: false,
+  },
+  {
+    id: 8,
+    nombre: 'Diego Castro Ramos',
+    dni: '63412890',
+    telefono: '921098765',
+    email: 'diego.castro@outlook.com',
+    vehiculo: { placa: 'HHH-888', marca: 'Mazda', modelo: 'CX-5', anio: 2022, color: 'Blanco Perla', combustible: 'Gasolina', tipo: 'SUV' },
+    tieneCita: true,
+  },
+  {
+    id: 9,
+    nombre: 'Sofia Mendoza Ríos',
+    dni: '48901234',
+    telefono: '945678901',
+    email: 'sofia.mendoza@gmail.com',
+    vehiculo: { placa: 'III-999', marca: 'Volkswagen', modelo: 'Golf', anio: 2020, color: 'Gris', combustible: 'Gasolina', tipo: 'Auto' },
+    tieneCita: false,
+  },
+  {
+    id: 10,
+    nombre: 'Miguel Soto Puma',
+    dni: '55678902',
+    telefono: '967890123',
+    email: '',
+    vehiculo: { placa: 'JJJ-000', marca: 'Ford', modelo: 'Ranger', anio: 2017, color: 'Negro', combustible: 'Diésel', tipo: 'Camioneta' },
+    tieneCita: false,
+  },
+];
+
 // Nota de QA: Esta variable "usuarioLogueado" ya no la usaremos para la lógica real 
 // porque ahora tenemos el AuthContext, pero la dejamos por si algún componente viejo aún la llama.
 export const usuarioLogueado = {

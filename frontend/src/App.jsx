@@ -7,6 +7,7 @@ import Productos from './pages/Productos'
 import Proveedores from './pages/Proveedores'
 import Rentabilidad from './pages/Rentabilidad'
 import Gestorcostos from './pages/Gestorcostos'
+import Clientes from './pages/Clientes'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/proveedores" element={<Proveedores />} />
           <Route path="/rentabilidad" element={<Rentabilidad />} />
           <Route path="/gestorcostos" element={<Gestorcostos />} />
+          <Route path="/clientes" element={<Clientes />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
