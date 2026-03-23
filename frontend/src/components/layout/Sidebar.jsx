@@ -1,8 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import logo from '../../assets/logo_taller.png'
+import { useAuth } from '../../context/AuthContext'
 
 function Sidebar({ collapsed }) {
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    logout(); // Esto borra el localStorage
+    navigate('/login'); // Y luego te patea al login
+  }
 
   return (
     <div className={`${collapsed ? 'w-16' : 'w-52'} min-h-screen flex flex-col transition-all duration-300`}
@@ -25,16 +32,13 @@ function Sidebar({ collapsed }) {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4">
-        {/* {!collapsed && (
-          <p className="text-xs uppercase tracking-widest px-2 mb-2" style={{ color: '#4a7fa8' }}>Menú</p>
-        )} */}
-
+        
+        {/* 1. TODOS ven el "Dashboard" (Es la pantalla principal) */}
         <NavLink
           to="/dashboard"
-          title="Usuarios"
+          title="Dashboard"
           className={({ isActive }) =>
-            `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors
-            ${collapsed ? 'justify-center' : ''}`
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`
           }
           style={({ isActive }) => ({
             background: isActive ? '#2a5f94' : 'transparent',
@@ -42,24 +46,52 @@ function Sidebar({ collapsed }) {
             borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
           })}
         >
+          {/* Icono de Tablero / Dashboard */}
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="8" r="4"/>
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
           </svg>
-          {!collapsed && <span>Usuarios</span>}
+          {!collapsed && <span>Dashboard</span>}
         </NavLink>
+
+        {/* 2. Solo ADMIN y GERENTE ven "Usuarios" */}
+        {(user?.rol === 'Admin' || user?.rol === 'Gerente') && (
+          <NavLink
+            to="/usuarios" 
+            title="Usuarios"
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`
+            }
+            style={({ isActive }) => ({
+              background: isActive ? '#2a5f94' : 'transparent',
+              color: isActive ? '#ffffff' : '#7aafd4',
+              borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
+            })}
+          >
+            {/* Icono de Persona / Usuarios */}
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+            {!collapsed && <span>Usuarios</span>}
+          </NavLink>
+        )}
+
       </nav>
 
       {/* Cerrar sesión */}
       <div className="px-2 py-3" style={{ borderTop: '0.5px solid #2a5080' }}>
         <button
-          onClick={() => navigate('/login')}
+          onClick={handleLogout} // Cambiamos esto
           title="Cerrar sesión"
           className={`flex items-center gap-2.5 px-3 py-2 rounded-lg w-full text-sm transition-colors ${collapsed ? 'justify-center' : ''}`}
           style={{ color: '#7aafd4' }}
           onMouseEnter={e => { e.currentTarget.style.background = '#e02020'; e.currentTarget.style.color = '#fff' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#7aafd4' }}
         >
+          {/* Icono (Igual) */}
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>

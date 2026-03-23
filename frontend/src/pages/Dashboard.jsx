@@ -1,40 +1,30 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import Sidebar from '../components/layout/Sidebar'
-import Navbar from '../components/layout/Navbar'
-import { usuariosMock } from '../services/mockData'
-import Usuarios from './Usuarios'
+import Layout from '../components/layout/Layout'
+import { useAuth } from '../context/AuthContext'
 
-function Dashboard() {
-  const [collapsed, setCollapsed] = useState(false)
-  const navigate = useNavigate()
-
-  const activos   = usuariosMock.filter(u => u.estado === 'Activo').length
-  const inactivos = usuariosMock.filter(u => u.estado === 'Inactivo').length
-
-  const rolColor = {
-    Admin:      'bg-red-50 text-red-600',
-    Mecánico:   'bg-purple-50 text-purple-600',
-    Recepción:  'bg-blue-50 text-blue-600',
-  }
+function DashboardHome() {
+  const { user } = useAuth() // Para saber quién entró
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      <Sidebar collapsed={collapsed} />
+    <Layout tituloNavbar="Dashboard Principal">
+      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          ¡Bienvenido, {user?.nombre || 'Usuario'}!
+        </h2>
+        <p className="text-gray-500 mb-6">
+          Has iniciado sesión con el rol de <strong>{user?.rol || 'No definido'}</strong>.
+        </p>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar
-          titulo="Usuarios"
-          subtitulo="Gestión de usuarios del sistema"
-          onToggle={() => setCollapsed(!collapsed)}
-        />
-
-        <div className="flex-1 overflow-y-auto">
-            <Usuarios />
+        {/* Aquí a futuro puedes poner gráficos, tarjetas de resumen, etc. */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <h3 className="text-blue-700 font-medium">Alertas del sistema</h3>
+            <p className="text-2xl font-bold text-blue-900 mt-2">0</p>
+          </div>
+          {/* Más tarjetas de resumen... */}
         </div>
       </div>
-    </div>
+    </Layout>
   )
 }
 
-export default Dashboard
+export default DashboardHome

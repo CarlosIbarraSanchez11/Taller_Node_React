@@ -1,4 +1,15 @@
+import { useAuth } from '../../context/AuthContext' // Importamos tu sesión
+import { talleresMock } from "../../services/mockData";
+
 function Navbar({ titulo, subtitulo, onToggle }) {
+  const { user } = useAuth(); // Extraemos al usuario logueado
+
+  // Lógica para saber qué poner en la esquina
+  const nombreTaller = user?.tallerId 
+    ? talleresMock.find(t => t.id === user?.tallerId)?.nombre 
+    : 'Vista Global';
+  
+  const inicialUsuario = user?.nombre ? user.nombre.charAt(0).toUpperCase() : 'U';
   return (
     <div className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-5">
 
@@ -35,10 +46,12 @@ function Navbar({ titulo, subtitulo, onToggle }) {
         {/* Nombre taller + avatar */}
         <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
           <div className="text-right">
-            <p className="text-xs font-medium text-gray-900">Taller 1</p>
-            <p className="text-xs text-gray-400">Admin</p>
+            <p className="text-xs font-medium text-gray-900">{user?.nombre || 'Invitado'}</p>
+            <p className="text-xs text-gray-400">{user?.rol || 'Sin Rol'} • {nombreTaller}</p>
           </div>
-          <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-xs font-medium text-white">A</div>
+          <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-xs font-medium text-white">
+            {inicialUsuario}
+          </div>
         </div>
 
       </div>
