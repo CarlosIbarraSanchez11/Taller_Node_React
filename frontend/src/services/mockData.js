@@ -218,11 +218,116 @@ export const movimientosMock = [
 ];
 
 export const pedidosMock = [
-  { id: 101, fecha: '2026-03-23T08:30:00', referencia: 'ABC-123', repuesto: 'Aceite 5W30', solicitante: 'Mec. Juan Pérez', cantidad: 4, stockSede: 10, estado: 'SOLICITADO', tallerId: 1 },
-  { id: 102, fecha: '2026-03-23T09:15:00', referencia: 'TKT-990', repuesto: 'Filtro de Aire', solicitante: 'Carlos Cliente', cantidad: 1, stockSede: 5, estado: 'SOLICITADO POR CLIENTE', tallerId: 1 },
-  { id: 103, fecha: '2026-03-23T10:00:00', referencia: 'TRANS-01', repuesto: 'Pastillas Freno', solicitante: 'Taller Surco', cantidad: 2, stockSede: 0, estado: 'SOLICITADO POR TALLER', tallerId: 1 },
+  { id: 101, fecha: '2026-03-23T08:30:00', referencia: 'ABC-123', repuesto: 'Aceite 5W30', solicitante: 'Mec. Juan Pérez', cantidad: 4, stockTaller: 10, estado: 'SOLICITADO', tallerId: 1, tallerSolicitanteId: 1 },
   
+  { id: 102, fecha: '2026-03-23T09:15:00', referencia: 'TKT-990', repuesto: 'Filtro de Aire', solicitante: 'Carlos Cliente', cantidad: 1, stockTaller: 5, estado: 'SOLICITADO POR CLIENTE', tallerId: 1, tallerSolicitanteId: null },
+  
+  { id: 103, fecha: '2026-03-23T10:00:00', referencia: 'TRANS-01', repuesto: 'Pastillas Freno', solicitante: 'Taller Surco', cantidad: 2, stockTaller: 8, estado: 'SOLICITADO POR TALLER', tallerId: 1, tallerSolicitanteId: 2 },
+  
+  { id: 104, fecha: '2026-03-23T11:00:00', referencia: 'TRANS-02', repuesto: 'Disco de Freno', solicitante: 'Taller Principal', cantidad: 1, stockTaller: 3, estado: 'SOLICITADO POR TALLER', tallerId: 2, tallerSolicitanteId: 1 },
 ];
+
+export const serviciosMock = [
+  { 
+    id: 1, 
+    tipo: 'MANTENIMIENTO', 
+    especialidad: 'PREVENTIVO', 
+    nivel: 'MENOR', 
+    tecnologia: 'CONVENCIONAL', 
+    categoria: 'AUTO', 
+    duracion: 2, 
+    precio: 440, 
+    // Insumos sacados de productosMock (IDs 4 y 9)
+    insumos: [
+      { productoId: 4, productoNombre: 'Aceite 5W30 Sintético', cantidad: 4, medida: 'LITROS' },
+      { productoId: 9, productoNombre: 'Filtro de Aceite - Sedán', cantidad: 1, medida: 'UNID' }
+    ], 
+    // Pasos sacados de pasosMasterMock (Fases y Áreas)
+    pasos: [
+      { id: 1, area: 'GENERAL', descripcion: 'Inspección visual de carrocería y reporte de daños.', fase: 'RECEPCIÓN' },
+      { id: 2, area: 'MOTOR', descripcion: 'Drenado de aceite de motor y cambio de filtro.', fase: 'EJECUCIÓN' },
+      { id: 3, area: 'GENERAL', descripcion: 'Prueba de ruta y reinicio de indicador.', fase: 'ENTREGA' }
+    ] 
+  },
+  { 
+    id: 2, 
+    tipo: 'MANTENIMIENTO', 
+    especialidad: 'PREVENTIVO', 
+    nivel: 'MENOR', 
+    tecnologia: 'CONVENCIONAL', 
+    categoria: 'CAMIONETA', 
+    duracion: 2, 
+    precio: 470, 
+    insumos: [
+      { productoId: 4, productoNombre: 'Aceite 5W30 Sintético', cantidad: 6, medida: 'LITROS' },
+      { productoId: 10, productoNombre: 'Filtro de Aceite - SUV', cantidad: 1, medida: 'UNID' }
+    ], 
+    pasos: [
+      { id: 1, area: 'GENERAL', descripcion: 'Recepción y validación de niveles iniciales.', fase: 'RECEPCIÓN' },
+      { id: 2, area: 'MOTOR', descripcion: 'Cambio de aceite (6L) y filtro SUV.', fase: 'EJECUCIÓN' },
+      { id: 3, area: 'FRENOS', descripcion: 'Inspección de pastillas y limpieza de discos.', fase: 'EJECUCIÓN' }
+    ] 
+  },
+  { id: 3,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MENOR', tecnologia: 'DIESEL',       categoria: 'CAMIONETA',  duracion: 3, precio: 600, insumos: [], pasos: [] },
+  { id: 4,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MENOR', tecnologia: 'DIESEL',       categoria: 'FURGON',     duracion: 3, precio: 600, insumos: [], pasos: [] },
+  { id: 5,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MENOR', tecnologia: 'GAMA ALTA',    categoria: 'GAMA ALTA',  duracion: 3, precio: 550, insumos: [], pasos: [] },
+  { id: 6,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MAYOR', tecnologia: 'CONVENCIONAL', categoria: 'AUTO',       duracion: 4, precio: 570, insumos: [], pasos: [] },
+  { id: 7,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MAYOR', tecnologia: 'GAMA ALTA',    categoria: 'GAMA ALTA',  duracion: 5, precio: 900, insumos: [], pasos: [] },
+  { id: 8,  tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO',                    nivel: 'MAYOR', tecnologia: 'CONVENCIONAL', categoria: 'CAMIONETA',  duracion: 4, precio: 590, insumos: [], pasos: [] },
+  { 
+    id: 9, 
+    tipo: 'MANTENIMIENTO', 
+    especialidad: 'PREVENTIVO AIRE ACONDICIONADO', 
+    nivel: 'MENOR', 
+    tecnologia: 'CONVENCIONAL', 
+    categoria: 'CAMIONETA', 
+    duracion: 2, 
+    precio: 250, 
+    insumos: [
+      { productoId: 11, productoNombre: 'Filtro de Aire Cabina (A/C)', cantidad: 1, medida: 'UNID' }
+    ], 
+    pasos: [
+      { id: 1, area: 'GENERAL', descripcion: 'Prueba de temperatura de salida A/C.', fase: 'RECEPCIÓN' },
+      { id: 2, area: 'GENERAL', descripcion: 'Limpieza de ductos y cambio de filtro de cabina.', fase: 'EJECUCIÓN' }
+    ] 
+  },
+  { id: 10, tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO AIRE ACONDICIONADO', nivel: 'MENOR', tecnologia: 'CONVENCIONAL', categoria: 'CAMIONETA',  duracion: 2, precio: 300, insumos: [], pasos: [] },
+  { id: 11, tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO AIRE ACONDICIONADO', nivel: 'MAYOR', tecnologia: 'CONVENCIONAL', categoria: 'AUTO',       duracion: 3, precio: 500, insumos: [], pasos: [] },
+  { id: 12, tipo: 'MANTENIMIENTO', especialidad: 'PREVENTIVO AIRE ACONDICIONADO', nivel: 'MAYOR', tecnologia: 'CONVENCIONAL', categoria: 'CAMIONETA',  duracion: 3, precio: 550, insumos: [], pasos: [] },
+  { 
+    id: 13, 
+    tipo: 'DIAGNOSTICO', 
+    especialidad: 'DIAGNOSTICO', 
+    nivel: 'REGULAR', 
+    tecnologia: 'CONVENCIONAL', 
+    categoria: 'AUTO', 
+    duracion: 3, 
+    precio: 250, 
+    insumos: [], // Los diagnósticos usualmente no llevan insumos predefinidos
+    pasos: [
+      { id: 1, area: 'GENERAL', descripcion: 'Recepción técnica y validación de fallas con el cliente.', fase: 'RECEPCIÓN' },
+      { id: 2, area: 'GENERAL', descripcion: 'Escaneo electrónico completo (Lectura DTC).', fase: 'EJECUCIÓN' },
+      { id: 3, area: 'GENERAL', descripcion: 'Inspección visual de motor (Fugas y mangueras).', fase: 'EJECUCIÓN' }
+    ] 
+  },
+  { id: 14, tipo: 'DIAGNOSTICO',   especialidad: 'DIAGNOSTICO',                   nivel: 'REGULAR', tecnologia: 'GAMA ALTA',   categoria: 'AUTO',     duracion: 2, precio: 600, insumos: [], pasos: [] },
+  { 
+    id: 15, 
+    tipo: 'DIAGNOSTICO', 
+    especialidad: 'DIAGNOSTICO', 
+    nivel: 'MENOR', 
+    tecnologia: 'GAMA ALTA', 
+    categoria: 'AUTO', 
+    duracion: 2, 
+    precio: 180, 
+    insumos: [], 
+    pasos: [
+      { id: 1, area: 'GENERAL', descripcion: 'Recepción y protección de interiores (Gama Alta).', fase: 'RECEPCIÓN' },
+      { id: 2, area: 'GENERAL', descripcion: 'Revisión de parámetros en computadora a bordo.', fase: 'EJECUCIÓN' }
+    ] 
+  },
+];
+
 
 // Nota de QA: Esta variable "usuarioLogueado" ya no la usaremos para la lógica real 
 // porque ahora tenemos el AuthContext, pero la dejamos por si algún componente viejo aún la llama.

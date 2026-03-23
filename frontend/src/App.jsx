@@ -10,6 +10,7 @@ import Gestorcostos from './pages/Gestorcostos'
 import Clientes from './pages/Clientes'
 import Ingresos from './pages/Ingresos'
 import Pedidos from './pages/Pedidos'
+import Servicios from './pages/Servicios'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/ingresos" element={<Ingresos />} />
           <Route path="/pedidos" element={<Pedidos />} />
+          <Route path="/servicios" element={<Servicios />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
