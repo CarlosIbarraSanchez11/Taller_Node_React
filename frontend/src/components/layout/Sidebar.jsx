@@ -94,6 +94,26 @@ function Sidebar({ collapsed }) {
               </svg>
               {!collapsed && <span>Rentabilidad</span>}
             </NavLink>
+
+            {/* Gestor de costos */}
+            <NavLink
+              to="/gestorcostos" 
+              title="Gestor de Costos"
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`
+              }
+              style={({ isActive }) => ({
+                background: isActive ? '#2a5f94' : 'transparent',
+                color: isActive ? '#ffffff' : '#7aafd4',
+                borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
+              })}
+            >
+              {/* Icono de Monedas / Ganancia */}
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              {!collapsed && <span>Gestor de Costos</span>}
+            </NavLink>
           </>
         )}
 

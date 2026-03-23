@@ -6,6 +6,7 @@ import Usuarios from './pages/Usuarios'
 import Productos from './pages/Productos'
 import Proveedores from './pages/Proveedores'
 import Rentabilidad from './pages/Rentabilidad'
+import Gestorcostos from './pages/Gestorcostos'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/productos" element={<Productos />} />
           <Route path="/proveedores" element={<Proveedores />} />
           <Route path="/rentabilidad" element={<Rentabilidad />} />
+          <Route path="/gestorcostos" element={<Gestorcostos />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
