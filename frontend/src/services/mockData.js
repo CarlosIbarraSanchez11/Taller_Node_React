@@ -74,6 +74,15 @@ export const proveedoresMock = [
   { id: 8, ruc: '20301234500', razonSocial: 'TRW Distribuciones E.I.R.L', telefono: '976001234', email: 'trw@dist.pe',             direccion: 'Av. Naciones Unidas 450, SJL',     estado: 'Inactivo' },
 ];
 
+export const configuracionRentabilidadMock = {
+  alquiler: 7,
+  gestion: 10,
+  marketing: 10,
+  herramientas: 2,
+  transporte: 5,
+  utilidad: 30,
+};
+
 // Nota de QA: Esta variable "usuarioLogueado" ya no la usaremos para la lógica real 
 // porque ahora tenemos el AuthContext, pero la dejamos por si algún componente viejo aún la llama.
 export const usuarioLogueado = {
