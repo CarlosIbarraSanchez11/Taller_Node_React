@@ -124,7 +124,7 @@ function Usuarios() {
   const [busqueda, setBusqueda] = useState('')
 
   // Filtrar según pestaña activa
-  let usuariosFiltrados = tabActiva === 'todos'
+  const usuariosFiltrados = tabActiva === 'todos'
     ? usuarios.filter(u => u.tallerId !== null)
     : usuarios.filter(u => u.tallerId === tabActiva)
 

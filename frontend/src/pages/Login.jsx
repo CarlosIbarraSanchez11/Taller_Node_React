@@ -27,7 +27,17 @@ function Login() {
         const result = loginMock(email, password);
 
         if (result.success) {
-            navigate('/dashboard'); 
+            // --- LÓGICA DE REDIRECCIÓN POR ROL ---
+            // Buscamos el usuario en el mock para conocer su rol antes de navegar
+            const userLogged = usuariosMock.find(u => u.email === email);
+
+            if (userLogged?.rol === 'Logística') {
+                // Si es Logística, va directo a Productos
+                navigate('/productos');
+            } else {
+                // Todos los demás roles van al Dashboard normal
+                navigate('/dashboard');
+            }
 
         } else {
             setError(result.message); // Mostrar error de credenciales
