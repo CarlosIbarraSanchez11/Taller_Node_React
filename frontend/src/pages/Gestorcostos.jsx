@@ -186,6 +186,8 @@ function ModalAjuste({ item, onClose, onSave }) {
 export default function GestorCostos() {
   const { user } = useAuth()
 
+  /* ─── HOOKS (Sinceramente, aquí está el orden correcto para React) ─── */
+  
   const [costos, setCostos] = useState(() =>
     productosMock.map(p => ({
       ...p,
@@ -203,11 +205,10 @@ export default function GestorCostos() {
 
   useEffect(() => setPage(1), [search, sort])
 
-  if (!user) return null
-
-  const toggleSort = col => setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
-
+  // 🚀 useMemo DEBE ejecutarse siempre (antes del return condicional)
   const filtered = useMemo(() => {
+    if (!user) return [] // Seguridad interna pero el hook se registró
+    
     let d = costos.filter(c =>
       c.nombre.toLowerCase().includes(search.toLowerCase()) ||
       c.marca.toLowerCase().includes(search.toLowerCase())
@@ -220,7 +221,13 @@ export default function GestorCostos() {
         : String(vb).localeCompare(String(va), undefined, { numeric: true })
     })
     return d
-  }, [costos, search, sort])
+  }, [costos, search, sort, user])
+
+  /* ─── VALIDACIÓN (Solo después de declarar todos los Hooks) ─── */
+  if (!user) return null
+
+  /* ─── LÓGICA DE COMPONENTE ─── */
+  const toggleSort = col => setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE))
   const rows = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE)
@@ -417,7 +424,7 @@ export default function GestorCostos() {
               <div className="flex items-center gap-1">
                 {[
                   { label: '«', action: () => setPage(1),                               disabled: page === 1 },
-                  { label: '‹', action: () => setPage(p => Math.max(1, p - 1)),         disabled: page === 1 },
+                  { label: '‹', action: () => setPage(p => Math.max(1, p - 1)),          disabled: page === 1 },
                   { label: '›', action: () => setPage(p => Math.min(totalPages, p + 1)),disabled: page === totalPages },
                   { label: '»', action: () => setPage(totalPages),                      disabled: page === totalPages },
                 ].map((b, i) => (
