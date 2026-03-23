@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Usuarios from './pages/Usuarios'
 import Productos from './pages/Productos'
+import Proveedores from './pages/Proveedores'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/productos" element={<Productos />} />
+          <Route path="/proveedores" element={<Proveedores />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

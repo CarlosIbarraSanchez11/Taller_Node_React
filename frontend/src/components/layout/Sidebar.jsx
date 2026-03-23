@@ -80,8 +80,10 @@ function Sidebar({ collapsed }) {
         )}
 
         {(user?.rol === 'Admin' || user?.rol === 'Gerente' || user?.rol === 'Logística') && (
+        <>
+          {/* Botón: Productos */}
           <NavLink
-            to="/productos" 
+            to="/productos"
             title="Productos"
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`
@@ -92,15 +94,37 @@ function Sidebar({ collapsed }) {
               borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
             })}
           >
-            {/* Icono de Caja / Productos */}
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
             </svg>
             {!collapsed && <span>Productos</span>}
           </NavLink>
-        )}
+
+          {/* Botón: Proveedores */}
+          <NavLink
+            to="/proveedores"
+            title="Proveedores"
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`
+            }
+            style={({ isActive }) => ({
+              background: isActive ? '#2a5f94' : 'transparent',
+              color: isActive ? '#ffffff' : '#7aafd4',
+              borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
+            })}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <rect x="1" y="3" width="15" height="13" />
+              <path d="M16 8h4l3 3v5h-7V8z" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+            {!collapsed && <span>Proveedores</span>}
+          </NavLink>
+        </>
+      )}
 
       </nav>
 

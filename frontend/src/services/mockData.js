@@ -40,6 +40,7 @@ export const usuariosMock = [
   { id: 20, nombre: 'Teresa Cueva',   email: 'teresa3@taller.com',  rol: 'Limpieza',      estado: 'Activo',   tallerId: 3 },
 ]
 
+// Productos
 export const productosMock = [
   { id: 1,  nombre: 'Aceite 10W30 Semisintético',    codigo: null, marca: 'Mobil',      categoria: 'Aceites',     stockActual: 10, stockMin: 5, medida: 'LITROS', tallerId: 1 },
   { id: 2,  nombre: 'Aceite 15W40 Diesel',           codigo: null, marca: 'Shell',      categoria: 'Aceites',     stockActual: 10, stockMin: 5, medida: 'LITROS', tallerId: 1 },
@@ -61,6 +62,17 @@ export const productosMock = [
   { id: 18, nombre: 'Batería 12V 60Ah',              codigo: null, marca: 'Bosch',      categoria: 'Eléctrico',   stockActual: 4,  stockMin: 2, medida: 'UNID',   tallerId: 3 },
   { id: 19, nombre: 'Correa de Distribución',        codigo: null, marca: 'Gates',      categoria: 'Motor',       stockActual: 7,  stockMin: 3, medida: 'UNID',   tallerId: 3 },
 ]
+
+export const proveedoresMock = [
+  { id: 1, ruc: '20600000001', razonSocial: 'JAMBO2 S.A.C',          telefono: '921872052', email: 'carlosmanuelibarra11@gmail.com', direccion: 'Av. Los Olivos 123, Lima',         estado: 'Activo' },
+  { id: 2, ruc: '20600000002', razonSocial: 'JAMBO3 S.A.C',          telefono: '921872052', email: 'carlosmanuelibarra11@gmail.com', direccion: 'Jr. Comercio 456, Lima',           estado: 'Activo' },
+  { id: 3, ruc: '00007231709', razonSocial: 'ZEROX S.A.C',           telefono: '921872052', email: '72317009@istsanpablo.edu.pe',    direccion: 'Av. Industrial 789, Callao',       estado: 'Activo' },
+  { id: 4, ruc: '20512345678', razonSocial: 'Repuestos El Chamo SAC', telefono: '999888777', email: 'ventas@elchamo.com',            direccion: 'Av. Las Malvinas 321, Lima',       estado: 'Activo' },
+  { id: 5, ruc: '20498765432', razonSocial: 'Autopartes Perú S.R.L', telefono: '955443322', email: 'info@autopartesperu.com',       direccion: 'Calle Los Mecánicos 55, Surco',    estado: 'Inactivo' },
+  { id: 6, ruc: '20356789012', razonSocial: 'Distribuidora Bosch Lima', telefono: '912345001', email: 'bosch@distribuidora.pe',    direccion: 'Av. Argentina 1200, Lima',         estado: 'Activo' },
+  { id: 7, ruc: '20412398700', razonSocial: 'Filtros & Aceites SAC', telefono: '934001122', email: 'ventas@filtrosaceites.pe',       direccion: 'Jr. Industriales 88, Ate',         estado: 'Activo' },
+  { id: 8, ruc: '20301234500', razonSocial: 'TRW Distribuciones E.I.R.L', telefono: '976001234', email: 'trw@dist.pe',             direccion: 'Av. Naciones Unidas 450, SJL',     estado: 'Inactivo' },
+];
 
 // Nota de QA: Esta variable "usuarioLogueado" ya no la usaremos para la lógica real 
 // porque ahora tenemos el AuthContext, pero la dejamos por si algún componente viejo aún la llama.
