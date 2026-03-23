@@ -431,29 +431,42 @@ function DataTable({ data, showTaller, onEdit, onDelete }) {
 
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function Productos() {
-  const { user } = useAuth(); // <--- EL ÚNICO QUE MANDA AQUÍ
+  // 1. EXTRAEMOS EL CONTEXTO
+  const { user } = useAuth();
 
-  // 1. SEGURIDAD: Si no hay usuario todavía, esperamos (Evita pantalla blanca)
-  if (!user) {
-    return <Layout tituloNavbar="Cargando..."><div className="p-6">Verificando credenciales...</div></Layout>;
-  }
+  /* ─── 2. TODOS LOS HOOKS VAN AQUÍ ARRIBA (Sin condiciones) ─── */
+  // Declaramos los estados primero para que React siempre vea el mismo orden
+  const [productos, setProductos] = useState(productosMock);
+  const [modalNuevo, setModalNuevo] = useState(false);
+  const [modalEditar, setModalEditar] = useState(null);
+  const [modalEliminar, setModalEliminar] = useState(null);
+  const [form, setForm] = useState(INIT_FORM);
+  const [search, setSearch] = useState(''); // Si usas buscador, agrégalo aquí
+  const [page, setPage] = useState(1);      // Si usas paginación, agrégalo aquí
 
-  // 2. CORRECCIÓN: Usamos 'user' para definir el acceso
-  const esGlobal = user.rol === 'Admin' || user.rol === 'Gerente';
-
-  // 3. CORRECCIÓN: Filtramos las pestañas usando 'user.tallerId'
+  // Definimos las variables de acceso usando ?. para prevenir errores si user es null
+  const esGlobal = user?.rol === 'Admin' || user?.rol === 'Gerente';
+  
   const tabs = esGlobal
     ? [{ id: 'todos', nombre: 'Todos' }, ...talleresMock]
-    : talleresMock.filter(t => t.id === user.tallerId);
+    : talleresMock.filter(t => t.id === user?.tallerId);
 
-  // 4. SEGURIDAD: Usamos ?. para que si tabs está vacío no explote
-  const [tabActiva, setTabActiva]       = useState(tabs[0]?.id || 'todos');
-  const [productos, setProductos]       = useState(productosMock);
-  const [modalNuevo, setModalNuevo]     = useState(false);
-  const [modalEditar, setModalEditar]   = useState(null);
-  const [modalEliminar, setModalEliminar] = useState(null);
-  const [form, setForm]                 = useState(INIT_FORM);
+  // El estado de la tab activa también debe declararse aquí arriba
+  const [tabActiva, setTabActiva] = useState('todos');
 
+  /* ─── 3. RECIÉN AQUÍ EL FILTRO DE SEGURIDAD ─── */
+  // Si no hay usuario, mostramos la carga, pero los Hooks de arriba ya se registraron
+  if (!user) {
+    return (
+      <Layout tituloNavbar="Cargando...">
+        <div className="p-6 text-gray-400 font-bold text-[10px] tracking-widest uppercase">
+          Verificando credenciales...
+        </div>
+      </Layout>
+    );
+  }
+
+  /* ─── 4. LÓGICA DE NEGOCIO (Después de que user existe) ─── */
   const filtrados = tabActiva === 'todos'
     ? productos
     : productos.filter(p => p.tallerId === tabActiva);
@@ -461,7 +474,7 @@ export default function Productos() {
   const stockBajos = filtrados.filter(p => p.stockActual <= p.stockMin).length;
   const totalStock = filtrados.reduce((acc, p) => acc + p.stockActual, 0);
 
-  // 5. CORRECCIÓN: Usamos 'user.tallerId' para productos nuevos de Logística
+  // Handlers
   const abrirNuevo = () => {
     setForm({ 
       ...INIT_FORM, 

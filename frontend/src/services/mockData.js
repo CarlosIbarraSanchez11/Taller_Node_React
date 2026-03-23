@@ -181,6 +181,49 @@ export const clientesMock = [
   },
 ];
 
+export const ORIGENES_INTERNOS = ['Carga de stock inicial', 'Ajuste de inventario', 'Transferencia entre talleres'];
+
+export const TIPO_CONFIG = {
+  con_ruc: { label: 'Con RUC', sub: 'Proveedor registrado', icon: '📄', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  sin_ruc: { label: 'Sin RUC', sub: 'Compra informal', icon: '🧾', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+  interno: { label: 'Ingreso Interno', sub: 'Stock inicial / Ajuste', icon: '👥', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+};
+
+export const movimientosMock = [
+  { id: 1, fecha: '2026-02-25T23:37:00', productoId: 1, productoNombre: 'Aceite 5W30 Sintético', marca: 'CASTROL', tipo: 'interno', origen: 'Carga de stock inicial', cantidad: 10, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 2, fecha: '2026-02-25T23:37:00', productoId: 2, productoNombre: 'Aceite 10W30 Semisintético', marca: 'MOBIL', tipo: 'interno', origen: 'Carga de stock inicial', cantidad: 10, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 3, fecha: '2026-02-25T23:37:00', productoId: 9, productoNombre: 'Filtro de Aceite - Sedán', marca: 'BOSCH', tipo: 'interno', origen: 'Carga de stock inicial', cantidad: 10, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 4, fecha: '2026-03-01T10:15:00', productoId: 5, productoNombre: 'Bujías Convencionales x4', marca: 'BOSCH', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 20, proveedorId: 5, proveedorNombre: 'Distribuidora Bosch Lima', tallerId: 1, estado: 'Aprobado' },
+  { id: 5, fecha: '2026-03-05T14:30:00', productoId: 6, productoNombre: 'Bujías Iridium x4', marca: 'BOSCH', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 15, proveedorId: 5, proveedorNombre: 'Distribuidora Bosch Lima', tallerId: 1, estado: 'Pendiente' },
+  { id: 6, fecha: '2026-03-10T09:00:00', productoId: 15, productoNombre: 'Pastillas de Freno Delanteras', marca: 'BREMBO', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 8, proveedorId: 6, proveedorNombre: 'Filtros & Aceites SAC', tallerId: 2, estado: 'Aprobado' },
+  { id: 7, fecha: '2026-03-10T09:00:00', productoId: 16, productoNombre: 'Disco de Freno', marca: 'BREMBO', tipo: 'sin_ruc', origen: 'Compra sin RUC', cantidad: 6, proveedorId: null, proveedorNombre: null, tallerId: 2, estado: 'Pendiente' },
+  { id: 8, fecha: '2026-03-12T11:45:00', productoId: 18, productoNombre: 'Batería 12V 60Ah', marca: 'BOSCH', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 4, proveedorId: 3, proveedorNombre: 'ZEROX S.A.C', tallerId: 3, estado: 'Pendiente' },
+  { id: 9, fecha: '2026-03-15T08:30:00', productoId: 1, productoNombre: 'Aceite 5W30 Sintético', marca: 'CASTROL', tipo: 'interno', origen: 'Transferencia desde Taller 2', cantidad: 5, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Solicitado' },
+  { id: 10, fecha: '2026-03-16T10:00:00', productoId: 12, productoNombre: 'Líquido de Frenos DOT4', marca: 'BOSCH', tipo: 'sin_ruc', origen: 'Compra sin RUC', cantidad: 12, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 11, fecha: '2026-03-17T12:20:00', productoId: 10, productoNombre: 'Filtro de Aire - SUV', marca: 'BOSCH', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 10, proveedorId: 5, proveedorNombre: 'Distribuidora Bosch Lima', tallerId: 2, estado: 'Solicitado' },
+  { id: 12, fecha: '2026-03-18T15:45:00', productoId: 18, productoNombre: 'Batería 12V 60Ah', marca: 'BOSCH', tipo: 'interno', origen: 'Carga de stock inicial', cantidad: 3, proveedorId: null, proveedorNombre: null, tallerId: 2, estado: 'Aprobado' },
+  { id: 13, fecha: '2026-03-19T09:10:00', productoId: 3, productoNombre: 'Aceite 20W50 Mineral', marca: 'MOBIL', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 24, proveedorId: 6, proveedorNombre: 'Filtros & Aceites SAC', tallerId: 1, estado: 'Pendiente' },
+  { id: 14, fecha: '2026-03-20T11:00:00', productoId: 4, productoNombre: 'Refrigerante G12 Red', marca: 'PRESTONE', tipo: 'sin_ruc', origen: 'Compra sin RUC', cantidad: 10, proveedorId: null, proveedorNombre: null, tallerId: 3, estado: 'Aprobado' },
+  { id: 15, fecha: '2026-03-20T14:20:00', productoId: 15, productoNombre: 'Pastillas de Freno Delanteras', marca: 'BREMBO', tipo: 'interno', origen: 'Transferencia desde Taller 1', cantidad: 2, proveedorId: null, proveedorNombre: null, tallerId: 2, estado: 'Solicitado' },
+  { id: 16, fecha: '2026-03-21T08:00:00', productoId: 8, productoNombre: 'Bujías Platinum x4', marca: 'NGK', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 30, proveedorId: 5, proveedorNombre: 'Distribuidora Bosch Lima', tallerId: 1, estado: 'Aprobado' },
+  { id: 17, fecha: '2026-03-21T10:30:00', productoId: 13, productoNombre: 'Limpiaparabrisas 22"', marca: 'BOSCH', tipo: 'sin_ruc', origen: 'Compra sin RUC', cantidad: 8, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 18, fecha: '2026-03-22T13:00:00', productoId: 14, productoNombre: 'Kit de Fajas de Alternador', marca: 'GATES', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 5, proveedorId: 3, proveedorNombre: 'ZEROX S.A.C', tallerId: 2, estado: 'Pendiente' },
+  { id: 19, fecha: '2026-03-22T16:15:00', productoId: 2, productoNombre: 'Aceite 10W30 Semisintético', marca: 'MOBIL', tipo: 'interno', origen: 'Transferencia desde Taller 1', cantidad: 6, proveedorId: null, proveedorNombre: null, tallerId: 3, estado: 'Solicitado' },
+  { id: 20, fecha: '2026-03-23T08:45:00', productoId: 7, productoNombre: 'Bujías Iridium x1', marca: 'DENSO', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 40, proveedorId: 5, proveedorNombre: 'Distribuidora Bosch Lima', tallerId: 1, estado: 'Aprobado' },
+  { id: 21, fecha: '2026-03-23T09:30:00', productoId: 11, productoNombre: 'Filtro de Aire - Sedán', marca: 'BOSCH', tipo: 'sin_ruc', origen: 'Compra sin RUC', cantidad: 15, proveedorId: null, proveedorNombre: null, tallerId: 1, estado: 'Aprobado' },
+  { id: 22, fecha: '2026-03-23T10:15:00', productoId: 17, productoNombre: 'Zapatas de Freno Post.', marca: 'BREMBO', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 10, proveedorId: 6, proveedorNombre: 'Filtros & Aceites SAC', tallerId: 2, estado: 'Pendiente' },
+  { id: 23, fecha: '2026-03-23T11:00:00', productoId: 5, productoNombre: 'Bujías Convencionales x4', marca: 'BOSCH', tipo: 'interno', origen: 'Ajuste de inventario', cantidad: 4, proveedorId: null, proveedorNombre: null, tallerId: 3, estado: 'Aprobado' },
+  { id: 24, fecha: '2026-03-23T12:00:00', productoId: 1, productoNombre: 'Aceite 5W30 Sintético', marca: 'CASTROL', tipo: 'con_ruc', origen: 'Compra con RUC', cantidad: 12, proveedorId: 6, proveedorNombre: 'Filtros & Aceites SAC', tallerId: 1, estado: 'Pendiente' },
+  { id: 25, fecha: '2026-03-23T13:30:00', productoId: 9, productoNombre: 'Filtro de Aceite - Sedán', marca: 'BOSCH', tipo: 'interno', origen: 'Transferencia desde Taller 1', cantidad: 10, proveedorId: null, proveedorNombre: null, tallerId: 2, estado: 'Solicitado' },
+];
+
+export const pedidosMock = [
+  { id: 101, fecha: '2026-03-23T08:30:00', referencia: 'ABC-123', repuesto: 'Aceite 5W30', solicitante: 'Mec. Juan Pérez', cantidad: 4, stockSede: 10, estado: 'SOLICITADO', tallerId: 1 },
+  { id: 102, fecha: '2026-03-23T09:15:00', referencia: 'TKT-990', repuesto: 'Filtro de Aire', solicitante: 'Carlos Cliente', cantidad: 1, stockSede: 5, estado: 'SOLICITADO POR CLIENTE', tallerId: 1 },
+  { id: 103, fecha: '2026-03-23T10:00:00', referencia: 'TRANS-01', repuesto: 'Pastillas Freno', solicitante: 'Taller Surco', cantidad: 2, stockSede: 0, estado: 'SOLICITADO POR TALLER', tallerId: 1 },
+  
+];
+
 // Nota de QA: Esta variable "usuarioLogueado" ya no la usaremos para la lógica real 
 // porque ahora tenemos el AuthContext, pero la dejamos por si algún componente viejo aún la llama.
 export const usuarioLogueado = {

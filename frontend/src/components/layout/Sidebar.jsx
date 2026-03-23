@@ -163,6 +163,46 @@ function Sidebar({ collapsed }) {
         </svg>
         {!collapsed && <span>Proveedores</span>}
       </NavLink>
+
+      <NavLink
+        to="/ingresos"
+        title="Ingresos"
+        className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`}
+        style={({ isActive }) => ({
+          background: isActive ? '#2a5f94' : 'transparent',
+          color: isActive ? '#ffffff' : '#7aafd4',
+          borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
+        })}
+      >
+        {/* Icono de Caja con Flecha hacia abajo (Entrada de stock) */}
+        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M21 8l-2-2H5L3 8v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z" />
+          <path d="M12 12v7" />
+          <path d="M9 16l3 3 3-3" />
+          <path d="M3 8h18" />
+        </svg>
+        {!collapsed && <span>Ingresos</span>}
+      </NavLink>
+
+      <NavLink
+        to="/pedidos"
+        title="Pedidos"
+        className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`}
+        style={({ isActive }) => ({
+          background: isActive ? '#2a5f94' : 'transparent',
+          color: isActive ? '#ffffff' : '#7aafd4',
+          borderLeft: isActive ? '3px solid #4da6ff' : '3px solid transparent',
+        })}
+      >
+        {/* Icono de Caja con Flecha hacia abajo (Entrada de stock) */}
+        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M21 8l-2-2H5L3 8v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z" />
+          <path d="M12 12v7" />
+          <path d="M9 16l3 3 3-3" />
+          <path d="M3 8h18" />
+        </svg>
+        {!collapsed && <span>Pedidos</span>}
+      </NavLink>
     </>
   )}
 

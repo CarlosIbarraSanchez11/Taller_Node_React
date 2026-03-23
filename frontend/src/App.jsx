@@ -8,6 +8,8 @@ import Proveedores from './pages/Proveedores'
 import Rentabilidad from './pages/Rentabilidad'
 import Gestorcostos from './pages/Gestorcostos'
 import Clientes from './pages/Clientes'
+import Ingresos from './pages/Ingresos'
+import Pedidos from './pages/Pedidos'
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
           <Route path="/rentabilidad" element={<Rentabilidad />} />
           <Route path="/gestorcostos" element={<Gestorcostos />} />
           <Route path="/clientes" element={<Clientes />} />
+          <Route path="/ingresos" element={<Ingresos />} />
+          <Route path="/pedidos" element={<Pedidos />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
