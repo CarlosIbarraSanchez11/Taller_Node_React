@@ -3,19 +3,20 @@ import { useState } from 'react' // Importar useState
 import logo from '../assets/logo_taller.png'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext' // Importar el hook de autenticación
-import { usuariosMock } from '../services/mockData'
+// import { usuariosMock } from '../services/mockData'
+import api from '../api/axios';
 
 function Login() {
     const navigate = useNavigate()
-    const { loginMock } = useAuth() // Obtener la función de login simulado
+    const { setAuth } = useAuth() // Obtener la función de login simulado
 
     // Estados para capturar los inputs
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
 
-    const handleSubmit = (e) => {
-        e.preventDefault(); // Prevenir que la página se recargue
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         setError('');
 
         if (!email || !password) {
@@ -23,24 +24,31 @@ function Login() {
             return;
         }
 
-        // Llamar a la validación mock
-        const result = loginMock(email, password);
+        try {
+            // 1. Petición real al backend
+            const response = await api.post('/auth/login', { email, password });
+            
+            // 2. Extraemos el token y los datos del usuario que envía el backend
+            const { token, usuario } = response.data;
 
-        if (result.success) {
-            // --- LÓGICA DE REDIRECCIÓN POR ROL ---
-            // Buscamos el usuario en el mock para conocer su rol antes de navegar
-            const userLogged = usuariosMock.find(u => u.email === email);
+            // 3. Guardamos el token para futuras peticiones
+            localStorage.setItem('token', token);
 
-            if (userLogged?.rol === 'Logística') {
-                // Si es Logística, va directo a Productos
+            // 4. Actualizamos el contexto global (asegúrate que useAuth tenga setAuth)
+            // Ya no usamos loginMock, usamos los datos reales
+            setAuth(usuario); 
+
+            // 5. Redirección por Rol (ahora usando el rol que viene de la DB)
+            if (usuario.rol === 'Logística') {
                 navigate('/productos');
             } else {
-                // Todos los demás roles van al Dashboard normal
                 navigate('/dashboard');
             }
 
-        } else {
-            setError(result.message); // Mostrar error de credenciales
+        } catch (error) {
+            // Si el backend responde con 401 o 404, mostramos el mensaje de error real
+            const mensajeError = error.response?.data?.error || 'Error al conectar con el servidor';
+            setError(mensajeError);
         }
     }
 

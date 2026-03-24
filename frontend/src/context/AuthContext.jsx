@@ -1,6 +1,4 @@
-// src/context/AuthContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
-import { usuariosMock } from '../services/mockData';
 
 const AuthContext = createContext();
 
@@ -8,53 +6,35 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Al cargar la app, verificar si había una sesión guardada en el navegador
+  // 1. Persistencia: Al cargar la app, recuperamos al usuario si existe
   useEffect(() => {
-    const sessionUser = localStorage.getItem('sessionUser');
-    if (sessionUser) {
-      setUser(JSON.parse(sessionUser));
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    
+    if (savedUser && token) {
+      setUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, []);
 
-  // --- ESTE ES TU "VALIDAR.PHP" SIMULADO ---
-  const loginMock = (email, password) => {
-    // 1. Buscamos en el array de mockData.js si existe el email
-    // (Simulamos que la contraseña siempre es '123456' para todos los mocks)
-    const foundUser = usuariosMock.find(u => u.email === email && password === '123456');
-
-    if (foundUser) {
-      if (foundUser.estado === 'Inactivo') {
-        return { success: false, message: 'Usuario inactivo. Contacte al administrador.' };
-      }
-
-      // 2. Si existe y está activo, guardamos la sesión
-      const sessionData = {
-        id: foundUser.id,
-        nombre: foundUser.nombre,
-        rol: foundUser.rol,
-        tallerId: foundUser.tallerId,
-      };
-
-      setUser(sessionData);
-      localStorage.setItem('sessionUser', JSON.stringify(sessionData)); // Guardar en navegador
-      return { success: true };
-    } else {
-      return { success: false, message: 'Credenciales incorrectas (Prueba con password: 123456).' };
-    }
+  // 2. Función para establecer el usuario (la que usas en Login.jsx)
+  const setAuth = (userData) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
   };
 
+  // 3. Cerrar sesión: Limpiamos TODO
   const logout = () => {
-    localStorage.removeItem('sessionUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginMock, logout, loading }}>
+    <AuthContext.Provider value={{ user, setAuth, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personalizado para usar el contexto fácilmente
 export const useAuth = () => useContext(AuthContext);

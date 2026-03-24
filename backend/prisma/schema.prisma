@@ -1,0 +1,76 @@
+// Configuración de conexión
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. EL TALLER
+model Taller {
+  id       Int       @id @default(autoincrement())
+  nombre   String
+  usuarios Usuario[]
+}
+
+// 2. USUARIOS
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String   @unique
+  password  String
+  rol       String
+  estado    String   @default("Activo")
+  tallerId  Int?
+  taller    Taller?  @relation(fields: [tallerId], references: [id])
+  citas     Cita[]
+  createdAt DateTime @default(now())
+
+  @@index([tallerId])
+}
+
+// 3. VEHÍCULOS
+model Vehiculo {
+  placa      String   @id
+  marca      String
+  modelo     String
+  clienteNom String
+  telefono   String
+  citas      Cita[]
+}
+
+// 4. SERVICIOS
+model Servicio {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  precio    Float
+  duracion  String
+  citas     Cita[]
+}
+
+// 5. CITAS
+model Cita {
+  id                 String   @id @default(cuid())
+  fecha              DateTime
+  hora_inicio        String
+  hora_fin           String
+  estado             String   @default("PENDIENTE")
+  token_confirmacion String   @unique @default(cuid())
+  
+  vehiculoPlaca      String
+  vehiculo           Vehiculo @relation(fields: [vehiculoPlaca], references: [placa])
+  
+  tecnicoId          Int
+  tecnico            Usuario  @relation(fields: [tecnicoId], references: [id])
+  
+  servicioId         Int
+  servicio           Servicio @relation(fields: [servicioId], references: [id])
+
+  createdAt          DateTime @default(now())
+
+  @@index([vehiculoPlaca])
+  @@index([tecnicoId])
+  @@index([servicioId])
+}
