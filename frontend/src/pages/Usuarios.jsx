@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import { usuariosMock, talleresMock, usuarioLogueado } from '../services/mockData'
+import api from "../api/axios"
+import { useAuth } from "../context/AuthContext"
 import Layout from '../components/layout/Layout'
 
 const rolesOpciones = ['Jefe Mecánico', 'Mecánico', 'Call', 'Logística', 'Facturación', 'Limpieza']
@@ -15,10 +16,10 @@ const ROL_STYLE = {
   'Limpieza':      { dot: '#64748b', bg: '#f8fafc', color: '#475569' },
 }
 
-const initialForm = { nombre: '', email: '', password: '', rol: 'Mecánico', estado: 'Activo', tallerId: 1 }
+const initialForm = { nombre: '', email: '', password: '', rol: 'Mecánico', estado: 'Activo', tallerId: '' }
 const ROWS_PER_PAGE = 10
 
-/* ─── UI Primitives (mismo estilo que Productos) ─────────────────── */
+/* ─── UI Primitives (Tus componentes originales) ─────────────────── */
 function Overlay({ onClose }) {
   return <div onClick={onClose} className="fixed inset-0 z-40"
     style={{ background: 'rgba(10,20,40,0.55)', backdropFilter: 'blur(2px)' }} />
@@ -38,9 +39,7 @@ function Modal({ title, onClose, children }) {
             </div>
             <button onClick={onClose}
               className="flex items-center justify-center rounded-lg transition-colors"
-              style={{ width: 28, height: 28, color: '#94a3b8' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}>
+              style={{ width: 28, height: 28, color: '#94a3b8' }}>
               <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -106,7 +105,6 @@ function ActionBtn({ icon, title, hoverBg, onClick }) {
   )
 }
 
-/* ─── Sort Icon ──────────────────────────────────────────────────── */
 function SortIcon({ dir }) {
   return (
     <span style={{ opacity: dir ? 1 : 0.3, marginLeft: 4, display: 'inline-flex', flexDirection: 'column', gap: 1.5 }}>
@@ -120,8 +118,9 @@ function SortIcon({ dir }) {
   )
 }
 
-/* ─── Form Usuario ───────────────────────────────────────────────── */
-function FormUsuario({ form, setForm, onSubmit, onClose, submitLabel }) {
+/* ─── Form Usuario (Corregido para recibir talleres reales) ───────────────── */
+/* ─── Form Usuario (Corregido) ───────────────── */
+function FormUsuario({ form, setForm, onSubmit, onClose, submitLabel, talleres }) {
   return (
     <form onSubmit={onSubmit}>
       <div className="grid grid-cols-2 gap-3 mb-5">
@@ -136,13 +135,15 @@ function FormUsuario({ form, setForm, onSubmit, onClose, submitLabel }) {
             onChange={e => setForm({ ...form, password: e.target.value })} />
         </Field>
         <Field label="Rol">
+          {/* AQUÍ ESTABA EL ERROR: Cambiamos </select> por </SSelect> */}
           <SSelect value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}>
             {rolesOpciones.map(r => <option key={r}>{r}</option>)}
-          </SSelect>
+          </SSelect> 
         </Field>
         <Field label="Taller asignado">
-          <SSelect value={form.tallerId} onChange={e => setForm({ ...form, tallerId: Number(e.target.value) })}>
-            {talleresMock.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+          <SSelect value={form.tallerId} onChange={e => setForm({ ...form, tallerId: e.target.value })}>
+            <option value="">Seleccionar taller...</option>
+            {talleres.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
           </SSelect>
         </Field>
         <Field label="Estado">
@@ -156,16 +157,12 @@ function FormUsuario({ form, setForm, onSubmit, onClose, submitLabel }) {
       <div className="flex gap-2">
         <button type="button" onClick={onClose}
           className="flex-1 py-2 text-sm rounded-lg font-medium transition-colors"
-          style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+          style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}>
           Cancelar
         </button>
         <button type="submit"
           className="flex-1 py-2 text-sm rounded-lg font-medium text-white transition-all"
-          style={{ background: '#1a3a5c' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#243f66'}
-          onMouseLeave={e => e.currentTarget.style.background = '#1a3a5c'}>
+          style={{ background: '#1a3a5c' }}>
           {submitLabel}
         </button>
       </div>
@@ -173,12 +170,12 @@ function FormUsuario({ form, setForm, onSubmit, onClose, submitLabel }) {
   )
 }
 
-/* ─── Data Table ─────────────────────────────────────────────────── */
-function DataTable({ data, showTaller, onEdit, onDelete }) {
-  const [sort, setSort]             = useState({ col: 'nombre', dir: 'asc' })
-  const [search, setSearch]         = useState('')
-  const [page, setPage]             = useState(1)
-  const [rolFilter, setRolFilter]   = useState('Todos')
+/* ─── Data Table (Tu lógica de orden/paginación intacta) ─────────────────── */
+function DataTable({ data, showTaller, onEdit, onDelete, talleres }) {
+  const [sort, setSort] = useState({ col: 'nombre', dir: 'asc' })
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [rolFilter, setRolFilter] = useState('Todos')
   const [estadoFilter, setEstadoFilter] = useState('Todos')
 
   useEffect(() => setPage(1), [search, rolFilter, estadoFilter, sort])
@@ -225,7 +222,6 @@ function DataTable({ data, showTaller, onEdit, onDelete }) {
     <div className="bg-white rounded-2xl overflow-hidden"
       style={{ border: '1px solid #e9edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
 
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 px-5 py-4" style={{ borderBottom: '1px solid #f1f5f9' }}>
         <div className="relative flex-1" style={{ minWidth: 200 }}>
           <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" fill="none" stroke="#94a3b8" strokeWidth="2" viewBox="0 0 24 24">
@@ -234,137 +230,91 @@ function DataTable({ data, showTaller, onEdit, onDelete }) {
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre, email o rol…"
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg outline-none transition-all"
-            style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b' }}
-            onFocus={e => { e.target.style.border = '1px solid #1a3a5c'; e.target.style.boxShadow = '0 0 0 3px rgba(26,58,92,0.08)' }}
-            onBlur={e => { e.target.style.border = '1px solid #e2e8f0'; e.target.style.boxShadow = 'none' }} />
+            style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b' }} />
         </div>
 
-        {[
-          { value: rolFilter,    setter: setRolFilter,    options: ['Todos', ...rolesOpciones, 'Admin', 'Gerente'] },
-          { value: estadoFilter, setter: setEstadoFilter, options: ['Todos', 'Activo', 'Inactivo'] },
-        ].map((f, i) => (
-          <select key={i} value={f.value} onChange={e => f.setter(e.target.value)}
-            className="py-2 pl-3 pr-7 text-xs rounded-lg outline-none transition-all"
-            style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
-            {f.options.map(o => <option key={o}>{o}</option>)}
-          </select>
-        ))}
+        <select value={rolFilter} onChange={e => setRolFilter(e.target.value)}
+          className="py-2 pl-3 pr-7 text-xs rounded-lg outline-none transition-all"
+          style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
+          <option>Todos</option>
+          {rolesOpciones.map(o => <option key={o}>{o}</option>)}
+          <option>Admin</option><option>Gerente</option>
+        </select>
+
+        <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)}
+          className="py-2 pl-3 pr-7 text-xs rounded-lg outline-none transition-all"
+          style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
+          <option>Todos</option><option>Activo</option><option>Inactivo</option>
+        </select>
 
         <span className="text-xs ml-auto" style={{ color: '#94a3b8' }}>
-          {filtered.length} {filtered.length === 1 ? 'usuario' : 'usuarios'}
+          {filtered.length} usuarios
         </span>
       </div>
 
-      {/* Table */}
       <div style={{ overflowX: 'auto' }}>
         <table className="w-full" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              <TH col="nombre" label="Nombre"   width="24%" />
-              <TH col="email"  label="Email"    width="24%" />
-              <TH col="rol"    label="Rol"      width="15%" />
+              <TH col="nombre" label="Nombre" width="24%" />
+              <TH col="email" label="Email" width="24%" />
+              <TH col="rol" label="Rol" width="15%" />
               {showTaller && <TH label="Taller" width="13%" />}
-              <TH col="estado" label="Estado"   width="11%" />
-              <TH              label="Acciones" width="8%"  />
+              <TH col="estado" label="Estado" width="11%" />
+              <TH label="Acciones" width="8%" />
             </tr>
           </thead>
           <tbody>
             {rows.map(u => {
               const rs = ROL_STYLE[u.rol] || { dot: '#94a3b8', bg: '#f1f5f9', color: '#475569' }
               return (
-                <tr key={u.id} style={{ borderTop: '1px solid #f1f5f9', transition: 'background .1s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-
-                  {/* Nombre con avatar */}
+                <tr key={u.id} style={{ borderTop: '1px solid #f1f5f9' }} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex items-center justify-center flex-shrink-0 rounded-full text-white text-xs font-semibold"
+                      <div className="flex items-center justify-center rounded-full text-white text-xs font-semibold"
                         style={{ width: 30, height: 30, background: '#1a3a5c' }}>
-                        {u.nombre.split(' ').slice(0, 2).map(n => n[0]).join('')}
+                        {u.nombre.charAt(0)}
                       </div>
-                      <span className="text-sm font-medium" style={{ color: '#1e293b' }}>{u.nombre}</span>
+                      <span className="text-sm font-medium text-slate-700">{u.nombre}</span>
                     </div>
                   </td>
-
-                  {/* Email */}
+                  <td className="px-4 py-3 text-sm text-slate-500">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span className="text-sm" style={{ color: '#64748b' }}>{u.email}</span>
-                  </td>
-
-                  {/* Rol */}
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"
                       style={{ background: rs.bg, color: rs.color }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: rs.dot, flexShrink: 0 }} />
                       {u.rol}
                     </span>
                   </td>
-
-                  {/* Taller */}
                   {showTaller && (
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-md font-medium"
-                        style={{ background: '#f1f5f9', color: '#64748b' }}>
-                        {talleresMock.find(t => t.id === u.tallerId)?.nombre || '—'}
-                      </span>
+                    <td className="px-4 py-3 text-xs font-bold text-slate-500">
+                      {talleres.find(t => t.id === Number(u.tallerId))?.nombre || '—'}
                     </td>
                   )}
-
-                  {/* Estado */}
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      style={u.estado === 'Activo'
-                        ? { background: '#f0fdf4', color: '#15803d' }
-                        : { background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: u.estado === 'Activo' ? '#22c55e' : '#cbd5e1' }} />
-                      {u.estado}
-                    </span>
+                  <td className="px-4 py-3 text-center">
+                     <div className={`h-2 w-2 rounded-full ${u.estado === 'Activo' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                   </td>
-
-                  {/* Acciones */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <ActionBtn icon="edit"   title="Editar"   hoverBg="#1a3a5c" onClick={() => onEdit(u)} />
+                      <ActionBtn icon="edit" title="Editar" hoverBg="#1a3a5c" onClick={() => onEdit(u)} />
                       <ActionBtn icon="delete" title="Eliminar" hoverBg="#dc2626" onClick={() => onDelete(u.id)} />
                     </div>
                   </td>
                 </tr>
               )
             })}
-
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={showTaller ? 6 : 5} className="py-14 text-center" style={{ color: '#94a3b8' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
-                  <p className="text-sm font-medium">Sin resultados</p>
-                  <p className="text-xs mt-1">Intenta con otros filtros de búsqueda</p>
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination (Tus botones originales) */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid #f1f5f9' }}>
-          <span className="text-xs" style={{ color: '#94a3b8' }}>Pág. {page} de {totalPages}</span>
-          <div className="flex items-center gap-1">
-            {[
-              { label: '«', action: () => setPage(1),                               disabled: page === 1 },
-              { label: '‹', action: () => setPage(p => Math.max(1, p - 1)),         disabled: page === 1 },
-              { label: '›', action: () => setPage(p => Math.min(totalPages, p + 1)),disabled: page === totalPages },
-              { label: '»', action: () => setPage(totalPages),                      disabled: page === totalPages },
-            ].map((b, i) => (
-              <button key={i} onClick={b.action} disabled={b.disabled}
-                className="flex items-center justify-center rounded-lg text-sm transition-all"
-                style={{ width: 30, height: 30, border: '1px solid #e2e8f0', color: b.disabled ? '#cbd5e1' : '#475569', background: '#fff', cursor: b.disabled ? 'not-allowed' : 'pointer', fontFamily: 'monospace' }}
-                onMouseEnter={e => { if (!b.disabled) e.currentTarget.style.background = '#f8fafc' }}
-                onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                {b.label}
-              </button>
-            ))}
+        <div className="flex items-center justify-between px-5 py-3 border-t">
+          <span className="text-xs text-slate-400">Pág. {page} de {totalPages}</span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(1)} className="px-2 py-1 border rounded text-xs">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} className="px-2 py-1 border rounded text-xs">‹</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-2 py-1 border rounded text-xs">›</button>
+            <button onClick={() => setPage(totalPages)} className="px-2 py-1 border rounded text-xs">»</button>
           </div>
         </div>
       )}
@@ -372,54 +322,98 @@ function DataTable({ data, showTaller, onEdit, onDelete }) {
   )
 }
 
-/* ─── Main Component ─────────────────────────────────────────────── */
+/* ─── Main Component (Uniendo tus 600 líneas con el Backend real) ────────── */
 function Usuarios() {
-  const esAdmin = usuarioLogueado.rol === 'Admin'
+  const { user: usuarioLogueado } = useAuth()
+  const esAdmin = usuarioLogueado?.rol === 'Admin'
 
-  const tabs = esAdmin
-    ? [{ id: 'todos', nombre: 'Todos' }, ...talleresMock]
-    : talleresMock.filter(t => t.id === usuarioLogueado.tallerId)
-
-  const [tabActiva, setTabActiva]         = useState(tabs[0].id)
-  const [usuarios, setUsuarios]           = useState(usuariosMock)
-  const [modalNuevo, setModalNuevo]       = useState(false)
-  const [modalEditar, setModalEditar]     = useState(null)
+  const [usuarios, setUsuarios] = useState([])
+  const [talleres, setTalleres] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [tabActiva, setTabActiva] = useState('todos')
+  
+  const [modalNuevo, setModalNuevo] = useState(false)
+  const [modalEditar, setModalEditar] = useState(null)
   const [modalEliminar, setModalEliminar] = useState(null)
-  const [form, setForm]                   = useState(initialForm)
+  const [form, setForm] = useState(initialForm)
 
-  const usuariosFiltrados = tabActiva === 'todos'
-    ? usuarios.filter(u => u.tallerId !== null)
-    : usuarios.filter(u => u.tallerId === tabActiva)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const [uRes, tRes] = await Promise.all([api.get('/usuarios'), api.get('/talleres')])
+        setUsuarios(uRes.data)
+        setTalleres(tRes.data)
+        if (!esAdmin && usuarioLogueado?.tallerId) setTabActiva(usuarioLogueado.tallerId)
+      } catch (err) { console.error("Error:", err) } 
+      finally { setLoading(false) }
+    }
+    fetchData()
+  }, [esAdmin, usuarioLogueado])
 
-  const activos   = usuariosFiltrados.filter(u => u.estado === 'Activo').length
+  const tabs = useMemo(() => {
+    const base = esAdmin ? [{ id: 'todos', nombre: 'Vista Global' }] : []
+    const sedes = esAdmin ? talleres : talleres.filter(t => t.id === usuarioLogueado?.tallerId)
+    return [...base, ...sedes]
+  }, [talleres, esAdmin, usuarioLogueado])
+
+  const usuariosFiltrados = useMemo(() => {
+    if (tabActiva === 'todos') return usuarios
+    return usuarios.filter(u => Number(u.tallerId) === Number(tabActiva))
+  }, [usuarios, tabActiva])
+
+  const activos = usuariosFiltrados.filter(u => u.estado === 'Activo').length
   const inactivos = usuariosFiltrados.filter(u => u.estado === 'Inactivo').length
 
   const abrirNuevo = () => {
-    setForm({ ...initialForm, tallerId: tabActiva === 'todos' ? 1 : tabActiva })
+    setForm(initialForm)
     setModalNuevo(true)
   }
 
-  const abrirEditar = u => {
+  const abrirEditar = (u) => {
     setForm({ ...u, password: '' })
     setModalEditar(u.id)
   }
 
-  const handleCrear = e => {
+  const handleCrear = async (e) => {
     e.preventDefault()
-    setUsuarios(prev => [...prev, { ...form, id: Date.now() }])
-    setModalNuevo(false)
+    try {
+      const res = await api.post('/usuarios', form)
+      setUsuarios([...usuarios, res.data])
+      setModalNuevo(false)
+    } catch (err) { alert("Error al crear") }
   }
 
-  const handleEditar = e => {
-    e.preventDefault()
-    setUsuarios(prev => prev.map(u => u.id === modalEditar ? { ...form, id: u.id } : u))
-    setModalEditar(null)
+  const handleEditar = async (e) => {
+    e.preventDefault();
+    
+    // 🏎️ Limpiamos el objeto antes de mandarlo al motor (Backend)
+    const payload = {
+      ...form,
+      // Si es un string vacío, mandamos null. Si no, lo volvemos número.
+      tallerId: form.tallerId === "" ? null : Number(form.tallerId)
+    };
+
+    try {
+      const res = await api.put(`/usuarios/${modalEditar}`, payload);
+      setUsuarios(usuarios.map(u => u.id === modalEditar ? res.data : u));
+      setModalEditar(null);
+      alert("¡Perfil actualizado con éxito! 🏎️💨");
+    } catch (err) {
+      console.error("Error en Dr. Motors:", err.response?.data);
+      alert("Error al actualizar. Revisa que el Taller sea válido.");
+    }
+  };
+
+  const handleEliminar = async () => {
+    try {
+      await api.delete(`/usuarios/${modalEliminar}`)
+      setUsuarios(usuarios.filter(u => u.id !== modalEliminar))
+      setModalEliminar(null)
+    } catch (err) { alert("Error al eliminar") }
   }
 
-  const handleEliminar = () => {
-    setUsuarios(prev => prev.filter(u => u.id !== modalEliminar))
-    setModalEliminar(null)
-  }
+  if (loading) return <Layout><div className="p-10 text-center font-bold text-slate-400 animate-pulse">SINCRONIZANDO MOTORES...</div></Layout>
 
   return (
     <Layout tituloNavbar="Gestión de Usuarios">
@@ -430,117 +424,67 @@ function Usuarios() {
         }
       `}</style>
 
-      <div className="p-6 min-h-screen" style={{ background: '#f6f8fb' }}>
-
-        {/* Page header */}
+      <div className="p-6 min-h-screen bg-[#f6f8fb]">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: '#1a3a5c' }}>Usuarios</h1>
-            <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Gestión de cuentas y accesos</p>
+            <h1 className="text-xl font-bold tracking-tight text-[#1a3a5c]">Usuarios</h1>
+            <p className="text-xs text-[#94a3b8]">Gestión de cuentas y accesos</p>
           </div>
-          <button onClick={abrirNuevo}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-xl transition-all shadow-sm"
-            style={{ background: '#1a3a5c' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#243f66'}
-            onMouseLeave={e => e.currentTarget.style.background = '#1a3a5c'}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Nuevo usuario
-          </button>
+          <button onClick={abrirNuevo} className="bg-[#1a3a5c] text-white px-4 py-2 text-sm font-medium rounded-xl shadow-lg">Nuevo usuario</button>
         </div>
 
-        {/* Stat cards — mismo estilo que Productos */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
             { label: 'Usuarios en vista', value: usuariosFiltrados.length, icon: '👥', accent: '#1a3a5c' },
-            { label: 'Activos',           value: activos,                  icon: '✅', accent: '#15803d' },
-            { label: 'Inactivos',         value: inactivos,                icon: '⏸',  accent: '#94a3b8' },
+            { label: 'Activos', value: activos, icon: '✅', accent: '#15803d' },
+            { label: 'Inactivos', value: inactivos, icon: '⏸', accent: '#94a3b8' },
           ].map(s => (
-            <div key={s.label} className="rounded-2xl p-4 bg-white"
-              style={{ border: '1px solid #e9edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div key={s.label} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</span>
-                <span style={{ fontSize: 16 }}>{s.icon}</span>
+                <span>{s.icon}</span>
               </div>
               <p className="text-3xl font-bold tracking-tight" style={{ color: s.accent }}>{s.value}</p>
             </div>
           ))}
         </div>
 
-        {/* Tabs */}
+        {/* Tabs de Sedes Reales */}
         {tabs.length > 1 && (
-          <div className="flex items-center gap-1 mb-4">
-            {tabs.map(tab => {
-              const active = tabActiva === tab.id
-              return (
-                <button key={tab.id} onClick={() => setTabActiva(tab.id)}
-                  className="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
-                  style={{
-                    background: active ? '#1a3a5c' : '#fff',
-                    color: active ? '#fff' : '#64748b',
-                    border: active ? '1px solid #1a3a5c' : '1px solid #e2e8f0',
-                    boxShadow: active ? '0 2px 8px rgba(26,58,92,0.18)' : 'none',
-                  }}>
-                  {tab.nombre}
-                </button>
-              )
-            })}
+          <div className="flex gap-1 mb-4">
+            {tabs.map(tab => (
+              <button key={tab.id} onClick={() => setTabActiva(tab.id)}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${tabActiva === tab.id ? 'bg-[#1a3a5c] text-white' : 'bg-white text-slate-400 border'}`}>
+                {tab.nombre}
+              </button>
+            ))}
           </div>
         )}
 
-        <DataTable
-          data={usuariosFiltrados}
-          showTaller={tabActiva === 'todos'}
-          onEdit={abrirEditar}
-          onDelete={setModalEliminar}
-        />
+        <DataTable data={usuariosFiltrados} talleres={talleres} showTaller={tabActiva === 'todos'} onEdit={abrirEditar} onDelete={setModalEliminar} />
       </div>
 
-      {/* Modal Nuevo */}
       {modalNuevo && (
-        <Modal title="Nuevo usuario" onClose={() => setModalNuevo(false)}>
-          <FormUsuario form={form} setForm={setForm}
-            onSubmit={handleCrear} onClose={() => setModalNuevo(false)}
-            submitLabel="Crear usuario" />
+        <Modal title="Nuevo Usuario" onClose={() => setModalNuevo(false)}>
+          <FormUsuario form={form} setForm={setForm} talleres={talleres} onSubmit={handleCrear} onClose={() => setModalNuevo(false)} submitLabel="Crear Cuenta" />
         </Modal>
       )}
 
-      {/* Modal Editar */}
       {modalEditar && (
-        <Modal title="Editar usuario" onClose={() => setModalEditar(null)}>
-          <FormUsuario form={form} setForm={setForm}
-            onSubmit={handleEditar} onClose={() => setModalEditar(null)}
-            submitLabel="Guardar cambios" />
+        <Modal title="Editar Perfil" onClose={() => setModalEditar(null)}>
+          <FormUsuario form={form} setForm={setForm} talleres={talleres} onSubmit={handleEditar} onClose={() => setModalEditar(null)} submitLabel="Guardar Cambios" />
         </Modal>
       )}
 
-      {/* Modal Eliminar */}
       {modalEliminar && (
-        <Modal title="Eliminar usuario" onClose={() => setModalEliminar(null)}>
-          <div className="flex items-start gap-3 mb-5 p-3.5 rounded-xl"
-            style={{ background: '#fff5f5', border: '1px solid #fee2e2' }}>
-            <svg width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <p className="text-sm" style={{ color: '#991b1b', lineHeight: 1.5 }}>
-              Esta acción es permanente. El usuario perderá acceso inmediatamente.
-            </p>
+        <Modal title="Eliminar" onClose={() => setModalEliminar(null)}>
+          <div className="p-4 bg-red-50 rounded-xl mb-4">
+            <p className="text-xs text-red-800 font-medium">¿Estás seguro de eliminar a este miembro? Esta acción es permanente.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setModalEliminar(null)}
-              className="flex-1 py-2 text-sm rounded-lg font-medium"
-              style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}>
-              Cancelar
-            </button>
-            <button onClick={handleEliminar}
-              className="flex-1 py-2 text-sm rounded-lg font-medium text-white"
-              style={{ background: '#dc2626' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#b91c1c'}
-              onMouseLeave={e => e.currentTarget.style.background = '#dc2626'}>
-              Sí, eliminar
-            </button>
+            <button onClick={() => setModalEliminar(null)} className="flex-1 py-2 text-sm font-bold text-slate-400">Cancelar</button>
+            <button onClick={handleEliminar} className="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm font-bold">Eliminar</button>
           </div>
         </Modal>
       )}

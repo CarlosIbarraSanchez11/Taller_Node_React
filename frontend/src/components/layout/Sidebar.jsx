@@ -7,8 +7,8 @@ function Sidebar({ collapsed }) {
   const { user, logout } = useAuth()
 
   const handleLogout = () => {
-    logout(); // Esto borra el localStorage
-    navigate('/login'); // Y luego te patea al login
+    logout(); 
+    navigate('/login'); 
   }
 
   return (

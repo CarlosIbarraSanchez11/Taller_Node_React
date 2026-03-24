@@ -30,11 +30,17 @@ export const register = async (req: Request, res: Response) => {
 };
 
 // Función para el LOGIN
+// En tu authController.ts
+
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   try {
-    const usuario = await prisma.usuario.findUnique({ where: { email } });
+    // 1. IMPORTANTE: Agregamos 'include' para traer los datos del taller
+    const usuario = await prisma.usuario.findUnique({ 
+      where: { email },
+      include: { taller: true } 
+    });
 
     if (!usuario) {
       return res.status(404).json({ error: "Usuario no encontrado" });
@@ -46,13 +52,19 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Contraseña incorrecta" });
     }
 
-    // Si todo está bien, creamos el "pase VIP" (Token)
     const token = jwt.sign({ id: usuario.id, rol: usuario.rol }, SECRET, { expiresIn: '8h' });
 
+    // 2. AQUÍ ESTABA EL ERROR: 
+    // Tienes que enviar 'tallerId' o el objeto 'taller' para que React lo vea
     res.json({ 
       mensaje: "Login exitoso", 
       token,
-      usuario: { nombre: usuario.nombre, rol: usuario.rol }
+      usuario: { 
+        nombre: usuario.nombre, 
+        rol: usuario.rol,
+        tallerId: usuario.tallerId, // <--- ¡AÑADE ESTO!
+        taller: usuario.taller      // <--- ¡Y ESTO (opcional pero recomendado)!
+      }
     });
   } catch (error) {
     res.status(500).json({ error: "Error en el servidor" });
