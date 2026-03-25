@@ -1,16 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES2020",                /* Versión de JavaScript moderna */
-    "module": "commonjs",              /* Sistema de módulos para Node.js */
-    "lib": ["es2020"],                 /* Librerías que puede usar */
-    "outDir": "./dist",                /* Dónde se guardará el código convertido */
-    "rootDir": "./src",                /* Dónde está tu código fuente (.ts) */
-    "strict": true,                    /* Activa todas las comprobaciones de seguridad */
-    "esModuleInterop": true,           /* Permite importar librerías de JS antiguo sin problemas */
-    "skipLibCheck": true,              /* Acelera la compilación saltando chequeos de librerías externas */
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["es2020"],
+    "outDir": "./dist",
+    "rootDir": "./", // <--- CAMBIO AQUÍ
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "types": ["node"]
   },
-  "include": ["src/**/*"],             /* Solo compila lo que esté en la carpeta src */
-  "exclude": ["node_modules"]          /* Ignora las librerías instaladas */
+  "include": ["src/**/*", "prisma/**/*"],
+  "exclude": ["node_modules"]
 }

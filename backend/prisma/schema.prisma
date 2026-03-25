@@ -101,3 +101,14 @@ model Proveedor {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model Rentabilidad {
+  id           Int      @id @default(1)
+  alquiler     Float    @default(0)
+  gestion      Float    @default(0)
+  marketing    Float    @default(0)
+  herramientas Float    @default(0)
+  transporte   Float    @default(0)
+  utilidad     Float    @default(0)
+  updatedAt    DateTime @updatedAt
+}

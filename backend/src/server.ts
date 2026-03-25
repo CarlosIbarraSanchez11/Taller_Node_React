@@ -6,6 +6,7 @@ import usuarioRoutes from './routes/usuarioRoutes';
 import tallerRoutes from './routes/tallerRoutes'; 
 import productoRoutes from './routes/productoRoutes';
 import proveedorRoutes from './routes/proveedorRoutes';
+import rentabilidadRoutes from './routes/rentabilidadRoutes';
 
 dotenv.config();
 
@@ -30,6 +31,9 @@ app.use('/api/productos', productoRoutes);
 
 // Ruta de Proveedores
 app.use('/api/proveedores', proveedorRoutes);
+
+// Ruta de Rentabilidad
+app.use('/api/rentabilidad', rentabilidadRoutes);
 
 // Rutas de Autenticación
 app.post('/api/auth/register', register);
