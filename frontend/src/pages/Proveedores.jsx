@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import api from "../api/axios"
+import { useAuth } from "../context/AuthContext"
 import Layout from '../components/layout/Layout'
-import { useAuth } from '../context/AuthContext'
-import { proveedoresMock } from '../services/mockData'
 
 const INIT_FORM = {
   ruc: '', razonSocial: '', telefono: '', email: '', direccion: '', categoria: 'Repuestos', estado: 'Activo'
@@ -270,8 +270,11 @@ function DataTable({ data, onEdit, onDelete, onToggle }) {
                       icon={p.estado === 'Activo' ? 'toggle_on' : 'toggle_off'}
                       title={p.estado === 'Activo' ? 'Desactivar' : 'Activar'}
                       hoverBg={p.estado === 'Activo' ? '#d97706' : '#15803d'}
-                      onClick={() => onToggle(p.id)}
+                      
+                      // CAMBIO AQUÍ: Enviamos el objeto 'p' completo, no solo el id
+                      onClick={() => onToggle(p)} 
                     />
+                    
                     <ActionBtn icon="edit"   title="Editar"   hoverBg="#1a3a5c" onClick={() => onEdit(p)} />
                     <ActionBtn icon="delete" title="Eliminar" hoverBg="#dc2626" onClick={() => onDelete(p.id)} />
                   </div>
@@ -318,56 +321,103 @@ function DataTable({ data, onEdit, onDelete, onToggle }) {
   )
 }
 
+function ErrorAlert({ message, onClose }) {
+  if (!message) return null;
+  return (
+    <div style={{ 
+      background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, 
+      padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16, 
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      animation: 'modalIn .2s ease-out' 
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span style={{ fontWeight: 600 }}>{message}</span>
+      </div>
+      <button type="button" onClick={onClose} 
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 18, lineHeight: 1 }}>
+        ×
+      </button>
+    </div>
+  );
+}
+
 /* ─── Form Proveedor ─────────────────────────────────────────────── */
-function FormProveedor({ form, setForm, onSubmit, onClose, submitLabel }) {
+function FormProveedor({ form, setForm, onSubmit, onClose, submitLabel, saving, error, onClearError }) {
   return (
     <form onSubmit={onSubmit}>
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      {/* ─── Aquí es donde se conecta la alerta roja ─── */}
+      <ErrorAlert message={error} onClose={onClearError} />
 
+      <div className="grid grid-cols-2 gap-3 mb-5">
         <Field label="RUC (11 dígitos)" span={2}>
-          <SInput required placeholder="Ej: 20600000000" maxLength={11}
-            value={form.ruc} onChange={e => setForm({ ...form, ruc: e.target.value.replace(/\D/g, '') })} />
+          <SInput 
+            required placeholder="Ej: 20600000000" maxLength={11}
+            disabled={saving}
+            value={form.ruc} 
+            onChange={e => setForm({ ...form, ruc: e.target.value.replace(/\D/g, '') })} 
+          />
         </Field>
 
         <Field label="Razón Social / Nombre empresa" span={2}>
-          <SInput required placeholder="Ej: Repuestos El Chamo SAC"
-            value={form.razonSocial} onChange={e => setForm({ ...form, razonSocial: e.target.value })} />
+          <SInput 
+            required placeholder="Ej: Repuestos El Chamo SAC"
+            disabled={saving}
+            value={form.razonSocial} 
+            onChange={e => setForm({ ...form, razonSocial: e.target.value })} 
+          />
         </Field>
 
         <Field label="Teléfono de contacto">
-          <SInput placeholder="999 999 999"
-            value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
+          <SInput 
+            placeholder="999 999 999"
+            disabled={saving}
+            value={form.telefono} 
+            onChange={e => setForm({ ...form, telefono: e.target.value })} 
+          />
         </Field>
 
         <Field label="Correo electrónico">
-          <SInput type="email" placeholder="ventas@proveedor.com"
-            value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          <SInput 
+            type="email" placeholder="ventas@proveedor.com"
+            disabled={saving}
+            value={form.email} 
+            onChange={e => setForm({ ...form, email: e.target.value })} 
+          />
         </Field>
 
         <Field label="Dirección fiscal / Oficina" span={2}>
-          <textarea rows={3} placeholder="Av. Las Malvinas 123, Lima..."
-            value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })}
-            className="w-full px-3 py-2 text-sm rounded-lg outline-none transition-all"
+          <textarea 
+            rows={3} placeholder="Av. Las Malvinas 123, Lima..."
+            disabled={saving}
+            value={form.direccion} 
+            onChange={e => setForm({ ...form, direccion: e.target.value })}
+            className="w-full px-3 py-2 text-sm rounded-lg outline-none transition-all disabled:opacity-50"
             style={{ border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', resize: 'vertical' }}
             onFocus={e => { e.target.style.border = '1px solid #1a3a5c'; e.target.style.boxShadow = '0 0 0 3px rgba(26,58,92,0.08)' }}
-            onBlur={e => { e.target.style.border = '1px solid #e2e8f0'; e.target.style.boxShadow = 'none' }} />
+            onBlur={e => { e.target.style.border = '1px solid #e2e8f0'; e.target.style.boxShadow = 'none' }} 
+          />
         </Field>
       </div>
 
       <div className="flex gap-2">
-        <button type="button" onClick={onClose}
-          className="flex-1 py-2 text-sm rounded-lg font-medium transition-colors"
-          style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+        <button type="button" onClick={onClose} disabled={saving}
+          className="flex-1 py-2 text-sm rounded-lg font-medium transition-colors disabled:opacity-40"
+          style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}>
           Cancelar
         </button>
-        <button type="submit"
-          className="flex-1 py-2 text-sm rounded-lg font-medium text-white transition-all"
-          style={{ background: '#1a3a5c' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#243f66'}
-          onMouseLeave={e => e.currentTarget.style.background = '#1a3a5c'}>
-          {submitLabel}
+        <button type="submit" disabled={saving}
+          className="flex-1 py-2 text-sm rounded-lg font-medium text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: '#1a3a5c' }}>
+          {saving && (
+            <svg className="animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity=".25" strokeWidth="4"/>
+              <path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>
+          )}
+          {saving ? 'Guardando...' : submitLabel}
         </button>
       </div>
     </form>
@@ -377,40 +427,135 @@ function FormProveedor({ form, setForm, onSubmit, onClose, submitLabel }) {
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function Proveedores() {
   const { user } = useAuth()
-  const [proveedores, setProveedores]     = useState(proveedoresMock)
+  
+  // ─── 1. ESTADOS REALES ───
+  const [proveedores, setProveedores]     = useState([]) // Empezamos vacío
+  const [loading, setLoading]             = useState(true)
+  const [saving, setSaving]               = useState(false)
   const [modalNuevo, setModalNuevo]       = useState(false)
   const [modalEditar, setModalEditar]     = useState(null)
   const [modalEliminar, setModalEliminar] = useState(null)
   const [form, setForm]                   = useState(INIT_FORM)
 
-  if (!user) return null
+  // Estados para alertas de error (Caja roja)
+  const [errorNuevo, setErrorNuevo]       = useState('')
+  const [errorEditar, setErrorEditar]     = useState('')
+  const [errorEliminar, setErrorEliminar] = useState('')
+
+  // ─── 2. CARGA DE DATOS ───
+  const fetchProveedores = async () => {
+    try {
+      setLoading(true)
+      const res = await api.get('/proveedores')
+      setProveedores(res.data)
+    } catch (err) {
+      console.error("Error al cargar proveedores:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (user) fetchProveedores()
+  }, [user])
+
+  if (!user || loading) return null // O podrías poner un spinner como en Productos
 
   const activos   = proveedores.filter(p => p.estado === 'Activo').length
   const inactivos = proveedores.filter(p => p.estado === 'Inactivo').length
 
-  const handleToggle = id =>
-    setProveedores(prev => prev.map(p =>
-      p.id === id ? { ...p, estado: p.estado === 'Activo' ? 'Inactivo' : 'Activo' } : p
-    ))
+  // ─── 3. HANDLERS CON BACKEND ───
 
-  const abrirNuevo  = () => { setForm(INIT_FORM); setModalNuevo(true) }
-  const abrirEditar = p  => { setForm({ ...p }); setModalEditar(p.id) }
+  const handleToggle = async (p) => {
+    // Verificamos qué está llegando para evitar el error
+    if (!p || !p.id) {
+      console.error("Error: El objeto proveedor no tiene un ID válido", p);
+      return;
+    }
 
-  const handleCrear = e => {
-    e.preventDefault()
-    setProveedores(prev => [...prev, { ...form, id: Date.now() }])
-    setModalNuevo(false)
+    try {
+      const nuevoEstado = p.estado === 'Activo' ? 'Inactivo' : 'Activo';
+
+      // Llamada al backend usando el ID real de la base de datos
+      await api.put(`/proveedores/${p.id}`, {
+        ...p,
+        estado: nuevoEstado
+      });
+
+      // 1. Refrescamos la lista completa para actualizar los contadores de arriba
+      await fetchProveedores(); 
+      
+    } catch (err) {
+      console.error("Error al cambiar el estado del proveedor:", err);
+    }
+  };
+
+  const abrirNuevo  = () => { 
+    setForm(INIT_FORM); 
+    setErrorNuevo(''); 
+    setModalNuevo(true) 
+  }
+  
+  const abrirEditar = p  => { 
+    setForm({ ...p }); 
+    setErrorEditar(''); 
+    setModalEditar(p.id) 
   }
 
-  const handleEditar = e => {
+  const handleCrear = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErrorNuevo(''); // Limpiamos cualquier error previo
+
+    try {
+      const { id, ...datosLimpios } = form;
+      await api.post('/proveedores', datosLimpios);
+
+      // Si todo va bien, cerramos y limpiamos
+      await fetchProveedores();
+      setModalNuevo(false);
+      setForm(INIT_FORM);
+    } catch (err) {
+      // AQUÍ ESTÁ EL TRUCO:
+      // Extraemos el mensaje que configuramos en el backend (handlePrismaError)
+      const mensajeDeError = err.response?.data?.error || 'Error al guardar el proveedor';
+      
+      // Lo guardamos en el estado que controla la alerta roja del modal
+      setErrorNuevo(mensajeDeError); 
+      
+      // NO cerramos el modal, para que el usuario pueda ver el error y corregir el RUC
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditar = async e => {
     e.preventDefault()
-    setProveedores(prev => prev.map(p => p.id === modalEditar ? { ...p, ...form } : p))
-    setModalEditar(null)
+    setSaving(true)
+    setErrorEditar('')
+    try {
+      await api.put(`/proveedores/${modalEditar}`, form)
+      await fetchProveedores()
+      setModalEditar(null)
+    } catch (err) {
+      setErrorEditar(err.response?.data?.error ?? 'Error al actualizar')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleEliminar = () => {
-    setProveedores(prev => prev.filter(p => p.id !== modalEliminar))
-    setModalEliminar(null)
+  const handleEliminar = async () => {
+    setSaving(true)
+    setErrorEliminar('')
+    try {
+      await api.delete(`/proveedores/${modalEliminar}`)
+      await fetchProveedores()
+      setModalEliminar(null)
+    } catch (err) {
+      setErrorEliminar(err.response?.data?.error ?? 'Error al eliminar')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -442,12 +587,12 @@ export default function Proveedores() {
           </button>
         </div>
 
-        {/* Stat cards — mismo estilo exacto que Productos */}
+        {/* Stat cards */}
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
             { label: 'Total Registrados', value: proveedores.length, icon: '🏢', accent: '#1a3a5c' },
-            { label: 'Convenios Activos', value: activos,            icon: '✅', accent: '#15803d' },
-            { label: 'Inactivos',         value: inactivos,          icon: '⏸',  accent: '#94a3b8' },
+            { label: 'Convenios Activos', value: activos,             icon: '✅', accent: '#15803d' },
+            { label: 'Inactivos',          value: inactivos,          icon: '⏸',  accent: '#94a3b8' },
           ].map(s => (
             <div key={s.label} className="rounded-2xl p-4 bg-white"
               style={{ border: '1px solid #e9edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -471,24 +616,38 @@ export default function Proveedores() {
       {/* Modal Nuevo */}
       {modalNuevo && (
         <Modal title="Nuevo Proveedor" onClose={() => setModalNuevo(false)}>
-          <FormProveedor form={form} setForm={setForm}
-            onSubmit={handleCrear} onClose={() => setModalNuevo(false)}
-            submitLabel="Guardar Proveedor" />
+          <FormProveedor 
+            form={form} 
+            setForm={setForm}
+            onSubmit={handleCrear} 
+            onClose={() => setModalNuevo(false)}
+            submitLabel="Guardar Proveedor"
+            saving={saving}           // <--- Nuevo
+            error={errorNuevo}        // <--- Nuevo
+            onClearError={() => setErrorNuevo('')} // <--- Nuevo
+          />
         </Modal>
       )}
 
       {/* Modal Editar */}
       {modalEditar && (
         <Modal title="Editar Proveedor" onClose={() => setModalEditar(null)}>
-          <FormProveedor form={form} setForm={setForm}
-            onSubmit={handleEditar} onClose={() => setModalEditar(null)}
-            submitLabel="Actualizar Datos" />
+          <FormProveedor 
+            form={form} setForm={setForm}
+            onSubmit={handleEditar} 
+            onClose={() => setModalEditar(null)}
+            submitLabel="Actualizar Datos"
+            saving={saving}
+            error={errorEditar} // <--- Caja roja
+            onClearError={() => setErrorEditar('')}
+          />
         </Modal>
       )}
 
       {/* Modal Eliminar */}
       {modalEliminar && (
         <Modal title="Eliminar proveedor" onClose={() => setModalEliminar(null)}>
+          <ErrorAlert message={errorEliminar} onClose={() => setErrorEliminar('')} />
           <div className="flex items-start gap-3 mb-5 p-3.5 rounded-xl"
             style={{ background: '#fff5f5', border: '1px solid #fee2e2' }}>
             <svg width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -500,17 +659,16 @@ export default function Proveedores() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setModalEliminar(null)}
+            <button onClick={() => setModalEliminar(null)} disabled={saving}
               className="flex-1 py-2 text-sm rounded-lg font-medium"
               style={{ border: '1px solid #e2e8f0', color: '#64748b', background: '#fff' }}>
               Cancelar
             </button>
-            <button onClick={handleEliminar}
-              className="flex-1 py-2 text-sm rounded-lg font-medium text-white"
-              style={{ background: '#dc2626' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#b91c1c'}
-              onMouseLeave={e => e.currentTarget.style.background = '#dc2626'}>
-              Sí, eliminar
+            <button onClick={handleEliminar} disabled={saving}
+              className="flex-1 py-2 text-sm rounded-lg font-medium text-white flex items-center justify-center gap-2"
+              style={{ background: '#dc2626' }}>
+              {saving && <span className="animate-spin">🌀</span>}
+              {saving ? 'Eliminando...' : 'Sí, eliminar'}
             </button>
           </div>
         </Modal>

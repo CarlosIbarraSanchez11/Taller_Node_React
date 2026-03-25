@@ -5,6 +5,7 @@ import { login, register } from './controllers/authController';
 import usuarioRoutes from './routes/usuarioRoutes'; 
 import tallerRoutes from './routes/tallerRoutes'; 
 import productoRoutes from './routes/productoRoutes';
+import proveedorRoutes from './routes/proveedorRoutes';
 
 dotenv.config();
 
@@ -26,6 +27,9 @@ app.use('/api/talleres', tallerRoutes);
 
 // Ruta de Productos
 app.use('/api/productos', productoRoutes);
+
+// Ruta de Proveedores
+app.use('/api/proveedores', proveedorRoutes);
 
 // Rutas de Autenticación
 app.post('/api/auth/register', register);
