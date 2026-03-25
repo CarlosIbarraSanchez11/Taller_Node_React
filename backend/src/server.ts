@@ -3,8 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { login, register } from './controllers/authController';
 import usuarioRoutes from './routes/usuarioRoutes'; 
-// 1. IMPORTA LAS RUTAS DE TALLERES (Asegúrate de haber creado este archivo)
 import tallerRoutes from './routes/tallerRoutes'; 
+import productoRoutes from './routes/productoRoutes';
 
 dotenv.config();
 
@@ -21,9 +21,11 @@ app.get('/', (req, res) => {
 // Rutas de Usuarios
 app.use('/api/usuarios', usuarioRoutes);
 
-// 2. ACTIVA LA RUTA DE TALLERES 🏎️
-// Esto hará que http://localhost:4000/api/talleres funcione
+// Ruta de talleres
 app.use('/api/talleres', tallerRoutes); 
+
+// Ruta de Productos
+app.use('/api/productos', productoRoutes);
 
 // Rutas de Autenticación
 app.post('/api/auth/register', register);
