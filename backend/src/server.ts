@@ -7,8 +7,9 @@ import tallerRoutes from './routes/tallerRoutes';
 import productoRoutes from './routes/productoRoutes';
 import proveedorRoutes from './routes/proveedorRoutes';
 import rentabilidadRoutes from './routes/rentabilidadRoutes';
-
+import costoMaestroRoutes from './routes/costoMaestroRoutes';
 dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -34,6 +35,9 @@ app.use('/api/proveedores', proveedorRoutes);
 
 // Ruta de Rentabilidad
 app.use('/api/rentabilidad', rentabilidadRoutes);
+
+// Ruta do costo Maestro
+app.use('/api/costos-maestros', costoMaestroRoutes);
 
 // Rutas de Autenticación
 app.post('/api/auth/register', register);
