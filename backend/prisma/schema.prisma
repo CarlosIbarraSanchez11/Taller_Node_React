@@ -8,10 +8,11 @@ datasource db {
 }
 
 model Taller {
-  id       Int       @id @default(autoincrement())
-  nombre   String
-  usuarios Usuario[]
-  productos Producto[]
+  id               Int            @id @default(autoincrement())
+  nombre           String
+  usuarios         Usuario[]
+  productos        Producto[]
+  ingresosDestino  IngresoStock[] @relation("TallerDestino")
 }
 
 model Usuario {
@@ -24,43 +25,83 @@ model Usuario {
   tallerId  Int?
   taller    Taller?  @relation(fields: [tallerId], references: [id])
   citas     Cita[]
+  // Relación con ingresos registrados por este usuario
+  ingresos  IngresoStock[]
   createdAt DateTime @default(now())
 
   @@index([tallerId])
 }
 
-model Producto {
-  id           Int      @id @default(autoincrement())
-  nombre       String
-  codigo       String? 
-  marca        String?
-  categoria    String   
-  stockActual  Int      @default(0)
-  stockMin     Int      @default(5)
-  medida       String   
+// model Producto {
+//   id           Int      @id @default(autoincrement())
+//   nombre       String
+//   codigo       String? 
+//   marca        String?
+//   categoria    String   
+//   stockActual  Int      @default(0)
+//   stockMin     Int      @default(5)
+//   medida       String   
   
-  tallerId     Int
-  taller       Taller   @relation(fields: [tallerId], references: [id])
+//   tallerId     Int
+//   taller       Taller   @relation(fields: [tallerId], references: [id])
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
 
-  @@unique([nombre, marca, medida, tallerId])
+//   @@unique([nombre, marca, medida, tallerId])
+// }
+model Producto {
+  id             Int          @id @default(autoincrement())
+  
+  costoMaestroId Int
+  costoMaestro   CostoMaestro @relation(fields: [costoMaestroId], references: [id])
+
+  tallerId       Int
+  taller         Taller       @relation(fields: [tallerId], references: [id])
+
+  stockActual    Int          @default(0)
+  stockMin       Int          @default(5)
+  
+  codigo         String?      @default("") 
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([costoMaestroId, tallerId]) 
 }
 
+// model CostoMaestro {
+//   id              Int      @id @default(autoincrement())
+//   // Llaves a vincular
+//   nombre          String
+//   marca           String
+//   medida          String
+  
+//   precioCompra    Float    @default(0)
+//   tiempoHH        Float    @default(0) 
+//   costoHH         Float    @default(0)
+//   cantTecnicos    Int      @default(1)
+  
+//   precioVenta     Float    @default(0) 
+
+//   @@unique([nombre, marca, medida]) 
+// }
 model CostoMaestro {
-  id              Int      @id @default(autoincrement())
-  // Llaves a vincular
-  nombre          String
-  marca           String
-  medida          String
+  id           Int        @id @default(autoincrement())
+  categoria    String     // 🚀 Clave para tus nuevos combos de filtrado
+  nombre       String
+  marca        String
+  medida       String
   
-  precioCompra    Float    @default(0)
-  tiempoHH        Float    @default(0) 
-  costoHH         Float    @default(0)
-  cantTecnicos    Int      @default(1)
-  
-  precioVenta     Float    @default(0) 
+  precioCompra Float      @default(0)
+  tiempoHH     Float      @default(0) 
+  costoHH      Float      @default(0)
+  cantTecnicos Int        @default(1)
+  precioVenta  Float      @default(0) 
+
+  // Relaciones: Un maestro puede estar en muchos talleres y tener muchos ingresos
+  productos    Producto[]     
+  ingresos     IngresoStock[] 
 
   @@unique([nombre, marca, medida]) 
 }
@@ -107,16 +148,17 @@ model Cita {
 }
 
 model Proveedor {
-  id          Int      @id @default(autoincrement())
-  ruc         String   @unique  // <--- Regla de oro: No se repite
-  razonSocial String
-  telefono    String?
-  email       String?
-  direccion   String?
-  estado      String   @default("Activo") // Activo / Inactivo
+  id           Int            @id @default(autoincrement())
+  ruc          String         @unique 
+  razonSocial  String
+  telefono     String?
+  email        String?
+  direccion    String?
+  estado       String         @default("Activo")
+  ingresos     IngresoStock[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
 
 model Rentabilidad {
@@ -128,4 +170,33 @@ model Rentabilidad {
   transporte   Float    @default(0)
   utilidad     Float    @default(0)
   updatedAt    DateTime @updatedAt
+}
+
+model IngresoStock {
+  id              Int      @id @default(autoincrement())
+  tipo            String   // "CON_RUC", "SIN_RUC", "INTERNO"
+  motivo          String   // "CARGA_INICIAL", "AJUSTE", "TRANSFERENCIA"
+  cantidad        Int
+  estado          String   @default("PENDIENTE") // PENDIENTE, APROBADO, SOLICITADO
+  
+  // Apuntamos al Maestro para poder solicitar cosas que aún no tenemos en stock local
+  costoMaestroId  Int
+  costoMaestro    CostoMaestro @relation(fields: [costoMaestroId], references: [id])
+  
+  tallerId        Int      // Sede que recibe
+  taller          Taller   @relation("TallerDestino", fields: [tallerId], references: [id])
+  
+  tallerOrigenId  Int?     // Sede que envía (para transferencias)
+  
+  proveedorId     Int?     
+  proveedor       Proveedor? @relation(fields: [proveedorId], references: [id])
+  
+  usuarioId       Int
+  usuario         Usuario    @relation(fields: [usuarioId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([costoMaestroId])
+  @@index([tallerId])
 }

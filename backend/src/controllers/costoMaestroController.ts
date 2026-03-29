@@ -1,49 +1,40 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Reutilizamos tu lógica de errores si quieres, o definimos una local
 const handlePrismaError = (error: unknown, res: Response) => {
-  console.error(error);
-  return res.status(500).json({ error: "Error procesando costos maestros" });
+  console.error("❌ Error en CostoMaestro:", error);
+  return res.status(500).json({ error: "Error procesando la operación logística" });
 };
 
+// 1. OBTENER TODO EL CATÁLOGO (Vista Global con Stock)
 export const getCostosMaestros = async (_req: Request, res: Response) => {
   try {
-    // 1. Agrupamos los productos por su "Identidad" para tener el stock total
-    const agrupados = await prisma.producto.groupBy({
-      by: ['nombre', 'marca', 'medida'],
-      _sum: {
-        stockActual: true,
+    // Traemos el catálogo e incluimos los registros de stock de TODOS los talleres
+    const maestros = await prisma.costoMaestro.findMany({
+      include: {
+        productos: true, 
       },
+      orderBy: { categoria: 'asc' }
     });
 
-    // 2. Traemos todas las configuraciones financieras existentes
-    const configs = await prisma.costoMaestro.findMany();
-
-    // 3. Cruzamos la info (Match)
-    const resultado = agrupados.map((p, index) => {
-      // Buscamos si ya tiene configuración de precio en la DB
-      const c = configs.find(conf => 
-        conf.nombre === p.nombre && 
-        conf.marca === p.marca && 
-        conf.medida === p.medida
-      );
+    // Formateamos para el frontend (calculando el stock total en red)
+    const resultado = maestros.map((m) => {
+      const stockTotal = m.productos.reduce((acc, p) => acc + p.stockActual, 0);
 
       return {
-        // Generamos un ID único para el frontend (ID real o temporal)
-        id: c?.id || `temp-${index}`, 
-        nombre: p.nombre,
-        marca: p.marca || "",
-        medida: p.medida,
-        stockTotal: p._sum.stockActual || 0,
-        // Si no hay config, devolvemos valores en 0
-        costoInsumo: c?.precioCompra || 0,
-        hh: c?.tiempoHH || 0,
-        costoHH: c?.costoHH || 0,
-        tecnicos: c?.cantTecnicos || 1,
-        precioVentaGuardado: c?.precioVenta || 0
+        id: m.id,
+        categoria: m.categoria,
+        nombre: m.nombre,
+        marca: m.marca,
+        medida: m.medida,
+        stockTotal: stockTotal,
+        costoInsumo: m.precioCompra,
+        hh: m.tiempoHH,
+        costoHH: m.costoHH,
+        tecnicos: m.cantTecnicos,
+        precioVentaGuardado: m.precioVenta
       };
     });
 
@@ -53,35 +44,42 @@ export const getCostosMaestros = async (_req: Request, res: Response) => {
   }
 };
 
+// 2. GUARDAR O EDITAR (Upsert por Identidad Única)
 export const upsertCostoMaestro = async (req: Request, res: Response) => {
-  const { nombre, marca, medida, costoInsumo, hh, costoHH, tecnicos, precioVenta } = req.body;
+  const { 
+    categoria, nombre, marca, medida, 
+    precioCompra, tiempoHH, costoHH, cantTecnicos, precioVenta 
+  } = req.body;
 
   try {
     const registro = await prisma.costoMaestro.upsert({
       where: {
-        // Gracias al @@unique([nombre, marca, medida]) que pusimos en Prisma
         nombre_marca_medida: {
-          nombre,
-          marca: marca || "",
-          medida
+          nombre: nombre.toUpperCase(),
+          marca: marca.toUpperCase(),
+          medida: medida
         }
       },
       update: {
-        precioCompra: Number(costoInsumo),
-        tiempoHH: Number(hh),
-        costoHH: Number(costoHH),
-        cantTecnicos: Number(tecnicos),
-        precioVenta: Number(precioVenta)
+        categoria,
+        // 🚀 LIMPIEZA: Si es NaN, guardamos 0
+        precioCompra: Number(precioCompra) || 0,
+        tiempoHH: Number(tiempoHH) || 0,
+        costoHH: Number(costoHH) || 0,
+        cantTecnicos: Number(cantTecnicos) || 0,
+        precioVenta: Number(precioVenta) || 0
       },
       create: {
-        nombre,
-        marca: marca || "",
-        medida,
-        precioCompra: Number(costoInsumo),
-        tiempoHH: Number(hh),
-        costoHH: Number(costoHH),
-        cantTecnicos: Number(tecnicos),
-        precioVenta: Number(precioVenta)
+        categoria,
+        nombre: nombre.toUpperCase(),
+        marca: marca.toUpperCase(),
+        medida: medida,
+        // 🚀 LIMPIEZA: Si es NaN, guardamos 0
+        precioCompra: Number(precioCompra) || 0,
+        tiempoHH: Number(tiempoHH) || 0,
+        costoHH: Number(costoHH) || 0,
+        cantTecnicos: Number(cantTecnicos) || 0,
+        precioVenta: Number(precioVenta) || 0
       }
     });
 

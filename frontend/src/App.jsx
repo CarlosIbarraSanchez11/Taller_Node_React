@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext' // <--- IMPORTA ESTO
+import { AuthProvider } from './context/AuthContext' 
+import { Toaster } from 'react-hot-toast'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Usuarios from './pages/Usuarios'
@@ -16,6 +17,17 @@ function App() {
   return (
     // EL PROVIDER DEBE ENVOLVER TODO
     <AuthProvider> 
+      <Toaster 
+        position="top-right"
+        reverseOrder={false}
+        toastOptions={{
+          style: {
+            fontSize: '12px',
+            fontWeight: 'bold',
+            borderRadius: '12px',
+          },
+        }}
+      />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/login" />} />
