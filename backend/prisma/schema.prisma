@@ -32,24 +32,6 @@ model Usuario {
   @@index([tallerId])
 }
 
-// model Producto {
-//   id           Int      @id @default(autoincrement())
-//   nombre       String
-//   codigo       String? 
-//   marca        String?
-//   categoria    String   
-//   stockActual  Int      @default(0)
-//   stockMin     Int      @default(5)
-//   medida       String   
-  
-//   tallerId     Int
-//   taller       Taller   @relation(fields: [tallerId], references: [id])
-
-//   createdAt    DateTime @default(now())
-//   updatedAt    DateTime @updatedAt
-
-//   @@unique([nombre, marca, medida, tallerId])
-// }
 model Producto {
   id             Int          @id @default(autoincrement())
   
@@ -70,25 +52,9 @@ model Producto {
   @@unique([costoMaestroId, tallerId]) 
 }
 
-// model CostoMaestro {
-//   id              Int      @id @default(autoincrement())
-//   // Llaves a vincular
-//   nombre          String
-//   marca           String
-//   medida          String
-  
-//   precioCompra    Float    @default(0)
-//   tiempoHH        Float    @default(0) 
-//   costoHH         Float    @default(0)
-//   cantTecnicos    Int      @default(1)
-  
-//   precioVenta     Float    @default(0) 
-
-//   @@unique([nombre, marca, medida]) 
-// }
 model CostoMaestro {
   id           Int        @id @default(autoincrement())
-  categoria    String     // 🚀 Clave para tus nuevos combos de filtrado
+  categoria    String  
   nombre       String
   marca        String
   medida       String
@@ -99,7 +65,6 @@ model CostoMaestro {
   cantTecnicos Int        @default(1)
   precioVenta  Float      @default(0) 
 
-  // Relaciones: Un maestro puede estar en muchos talleres y tener muchos ingresos
   productos    Producto[]     
   ingresos     IngresoStock[] 
 
@@ -199,4 +164,48 @@ model IngresoStock {
 
   @@index([costoMaestroId])
   @@index([tallerId])
+}
+
+model Pedido {
+  id              Int      @id @default(autoincrement())
+  codigo          String   @unique // Ej: TRANS-001, PED-990
+  tipo            PedidoTipo @default(TRANSFERENCIA) // TRANSFERENCIA, CLIENTE, SERVICIO
+  
+  // El Producto
+  costoMaestroId  Int
+  costoMaestro    CostoMaestro @relation(fields: [costoMaestroId], references: [id])
+  cantidad        Int
+  
+  // ¿Quién pide? (Taller Destino)
+  tallerId        Int
+  taller          Taller       @relation("PedidosRecibidos", fields: [tallerId], references: [id])
+  
+  // ¿A quién le pide? (Taller Origen)
+  tallerOrigenId  Int?
+  tallerOrigen    Taller?      @relation("PedidosEnviados", fields: [tallerOrigenId], references: [id])
+  
+  // Datos del flujo
+  estado          PedidoEstado @default(PENDIENTE)
+  prioridad       String?      @default("NORMAL") // ALTA, MEDIA, BAJA
+  placa           String?      // Para asociarlo a un auto específico
+  solicitante     String?      // Nombre del mecánico o cliente
+  
+  usuarioId       Int          // Quién creó el pedido
+  usuario         Usuario      @relation(fields: [usuarioId], references: [id])
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+enum PedidoTipo {
+  TRANSFERENCIA
+  CLIENTE
+  SERVICIO
+}
+
+enum PedidoEstado {
+  PENDIENTE
+  DESPACHADO
+  ENTREGADO
+  CANCELADO
 }

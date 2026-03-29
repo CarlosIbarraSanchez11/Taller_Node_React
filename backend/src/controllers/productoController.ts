@@ -20,18 +20,30 @@ const handlePrismaError = (error: unknown, res: Response) => {
 };
 
 // 1. Obtener todos los productos con su identidad maestra
-export const getProductos = async (_req: Request, res: Response) => {
+export const getProductos = async (req: Request, res: Response) => {
+  // 🚀 1. Capturamos el maestroId que envía el frontend (?maestroId=...)
+  const { maestroId } = req.query;
+
   try {
     const productos = await prisma.producto.findMany({
+      // 🚀 2. Filtramos: Si viene maestroId, tráeme solo ese repuesto en todos los talleres
+      where: maestroId ? {
+        costoMaestroId: Number(maestroId)
+      } : {}, 
       include: {
-        costoMaestro: true, // 🚀 Trae Nombre, Marca, Medida, Categoria
-        taller: true        // Trae el nombre del taller (Sede)
+        costoMaestro: true, 
+        taller: true        
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { 
+        taller: { nombre: 'asc' } // Opcional: ordenarlos por nombre de taller
+      }
     });
+
     res.json(productos);
   } catch (error) {
-    handlePrismaError(error, res);
+    // Si no tienes handlePrismaError definido aquí, usa console.error + res.status(500)
+    console.error("Error al obtener productos:", error);
+    res.status(500).json({ error: "Error al obtener stock en red" });
   }
 };
 

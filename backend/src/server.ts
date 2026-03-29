@@ -8,6 +8,7 @@ import productoRoutes from './routes/productoRoutes';
 import proveedorRoutes from './routes/proveedorRoutes';
 import rentabilidadRoutes from './routes/rentabilidadRoutes';
 import costoMaestroRoutes from './routes/costoMaestroRoutes';
+import ingresosRoutes from './routes/ingresosRoutes';
 dotenv.config();
 
 
@@ -38,6 +39,9 @@ app.use('/api/rentabilidad', rentabilidadRoutes);
 
 // Ruta do costo Maestro
 app.use('/api/costos-maestros', costoMaestroRoutes);
+
+// Ruta de Ingresos
+app.use('/api/ingresos', ingresosRoutes);
 
 // Rutas de Autenticación
 app.post('/api/auth/register', register);

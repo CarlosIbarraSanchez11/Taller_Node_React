@@ -60,6 +60,7 @@ export const login = async (req: Request, res: Response) => {
       mensaje: "Login exitoso", 
       token,
       usuario: { 
+        id: usuario.id,
         nombre: usuario.nombre, 
         rol: usuario.rol,
         tallerId: usuario.tallerId, // <--- ¡AÑADE ESTO!
