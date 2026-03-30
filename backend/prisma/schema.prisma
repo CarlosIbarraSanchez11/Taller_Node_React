@@ -8,27 +8,34 @@ datasource db {
 }
 
 model Taller {
-  id               Int            @id @default(autoincrement())
-  nombre           String
-  usuarios         Usuario[]
-  productos        Producto[]
-  ingresosDestino  IngresoStock[] @relation("TallerDestino")
+  id              Int            @id @default(autoincrement())
+  nombre          String
+  usuarios        Usuario[]
+  productos       Producto[]
+  ingresosDestino IngresoStock[] @relation("TallerDestino")
+
+  ingresosOrigen  IngresoStock[] @relation("TallerOrigen")
+  pedidosRecibidos Pedido[] @relation("PedidosRecibidos")
+  pedidosEnviados  Pedido[] @relation("PedidosEnviados")
 }
 
 model Usuario {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  email     String   @unique
-  password  String
-  rol       String
-  estado    String   @default("Activo")
-  tallerId  Int?
-  taller    Taller?  @relation(fields: [tallerId], references: [id])
-  citas     Cita[]
-  // Relación con ingresos registrados por este usuario
+  id       Int     @id @default(autoincrement())
+  nombre   String
+  email    String  @unique
+  password String
+  rol      String
+  estado   String  @default("Activo")
+  tallerId Int?
+  taller   Taller? @relation(fields: [tallerId], references: [id])
+  citas    Cita[]
+  
   ingresos  IngresoStock[]
+  
+  // 🚀 RELACIÓN PARA PEDIDOS (Agregado)
+  pedidos   Pedido[] 
+  
   createdAt DateTime @default(now())
-
   @@index([tallerId])
 }
 
@@ -53,20 +60,23 @@ model Producto {
 }
 
 model CostoMaestro {
-  id           Int        @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   categoria    String  
   nombre       String
   marca        String
   medida       String
   
-  precioCompra Float      @default(0)
-  tiempoHH     Float      @default(0) 
-  costoHH      Float      @default(0)
-  cantTecnicos Int        @default(1)
-  precioVenta  Float      @default(0) 
+  precioCompra Float    @default(0)
+  tiempoHH     Float    @default(0) 
+  costoHH      Float    @default(0)
+  cantTecnicos Int      @default(1)
+  precioVenta  Float    @default(0) 
 
   productos    Producto[]     
   ingresos     IngresoStock[] 
+
+  // 🚀 RELACIÓN PARA PEDIDOS (Agregado)
+  pedidos      Pedido[] 
 
   @@unique([nombre, marca, medida]) 
 }
@@ -152,6 +162,7 @@ model IngresoStock {
   taller          Taller   @relation("TallerDestino", fields: [tallerId], references: [id])
   
   tallerOrigenId  Int?     // Sede que envía (para transferencias)
+  tallerOrigen    Taller?      @relation("TallerOrigen", fields: [tallerOrigenId], references: [id])
   
   proveedorId     Int?     
   proveedor       Proveedor? @relation(fields: [proveedorId], references: [id])
@@ -166,35 +177,12 @@ model IngresoStock {
   @@index([tallerId])
 }
 
-model Pedido {
-  id              Int      @id @default(autoincrement())
-  codigo          String   @unique // Ej: TRANS-001, PED-990
-  tipo            PedidoTipo @default(TRANSFERENCIA) // TRANSFERENCIA, CLIENTE, SERVICIO
-  
-  // El Producto
-  costoMaestroId  Int
-  costoMaestro    CostoMaestro @relation(fields: [costoMaestroId], references: [id])
-  cantidad        Int
-  
-  // ¿Quién pide? (Taller Destino)
-  tallerId        Int
-  taller          Taller       @relation("PedidosRecibidos", fields: [tallerId], references: [id])
-  
-  // ¿A quién le pide? (Taller Origen)
-  tallerOrigenId  Int?
-  tallerOrigen    Taller?      @relation("PedidosEnviados", fields: [tallerOrigenId], references: [id])
-  
-  // Datos del flujo
-  estado          PedidoEstado @default(PENDIENTE)
-  prioridad       String?      @default("NORMAL") // ALTA, MEDIA, BAJA
-  placa           String?      // Para asociarlo a un auto específico
-  solicitante     String?      // Nombre del mecánico o cliente
-  
-  usuarioId       Int          // Quién creó el pedido
-  usuario         Usuario      @relation(fields: [usuarioId], references: [id])
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+enum PedidoEstado {
+  PENDIENTE
+  DESPACHADO
+  RECHAZADO
+  ENTREGADO
+  CANCELADO
 }
 
 enum PedidoTipo {
@@ -203,9 +191,29 @@ enum PedidoTipo {
   SERVICIO
 }
 
-enum PedidoEstado {
-  PENDIENTE
-  DESPACHADO
-  ENTREGADO
-  CANCELADO
+// --- MODELO DE PEDIDOS ---
+model Pedido {
+  id              Int          @id @default(autoincrement())
+  codigo          String       @unique
+  tipo            PedidoTipo   @default(TRANSFERENCIA)
+  estado          PedidoEstado @default(PENDIENTE)
+  cantidad        Int
+  placa           String?      
+  solicitante     String?      
+  observaciones   String?      
+
+  costoMaestroId  Int
+  costoMaestro    CostoMaestro @relation(fields: [costoMaestroId], references: [id])
+
+  tallerId        Int          
+  taller          Taller       @relation("PedidosRecibidos", fields: [tallerId], references: [id])
+
+  tallerOrigenId  Int?         
+  tallerOrigen    Taller?      @relation("PedidosEnviados", fields: [tallerOrigenId], references: [id])
+
+  usuarioId       Int
+  usuario         Usuario      @relation(fields: [usuarioId], references: [id])
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }

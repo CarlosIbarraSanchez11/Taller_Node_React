@@ -3,8 +3,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// 1. CREAR INGRESO (Carga inicial, Compra o Solicitud Interna)
 export const crearIngreso = async (req: Request, res: Response) => {
-  // 1. Extraemos los nuevos campos: estado y tallerOrigenId
   const { 
     tallerId, 
     usuarioId, 
@@ -13,11 +13,11 @@ export const crearIngreso = async (req: Request, res: Response) => {
     motivo, 
     proveedorId, 
     tallerOrigenId, 
-    estado // Este vendrá como 'SOLICITADO' o 'APROBADO'
+    estado 
   } = req.body;
 
-  console.log("📥 PROCESANDO OPERACIÓN:", { tipo, motivo, estado, tallerOrigenId });
-
+  // Si es transferencia interna, empieza como SOLICITADO. Si es compra/carga, APROBADO.
+  const estadoFinal = estado || (tipo === "INTERNO" ? "SOLICITADO" : "APROBADO");
   const idParaPrisma = Number(usuarioId) || 4;
 
   try {
@@ -31,26 +31,28 @@ export const crearIngreso = async (req: Request, res: Response) => {
             tipo: tipo || "CON_RUC",
             motivo: motivo || "CARGA_INICIAL",
             cantidad: Number(item.cantidad),
-            estado: estado || "APROBADO",
+            estado: estadoFinal,
             
-            // 🔗 ESTAS RELACIONES SÍ USAN CONNECT (porque están bien definidas en tu schema)
+            // 1. Relaciones Obligatorias (Siempre usar connect)
             costoMaestro: { connect: { id: Number(item.costoMaestroId) } },
             taller:       { connect: { id: Number(tallerId) } },
             usuario:      { connect: { id: idParaPrisma } },
 
-            // 🚀 AQUÍ EL CAMBIO: Usamos el ID directamente como sugiere el error
-            tallerOrigenId: tallerOrigenId ? Number(tallerOrigenId) : null,
+            // 2. Relaciones Opcionales (Solo si el ID existe)
+            // 🚀 IMPORTANTE: Usamos el nombre de la relación 'tallerOrigen', NO el ID 'tallerOrigenId'
+            ...(tallerOrigenId ? { 
+              tallerOrigen: { connect: { id: Number(tallerOrigenId) } } 
+            } : {}),
 
-            ...(proveedorId && { 
+            ...(proveedorId ? { 
               proveedor: { connect: { id: Number(proveedorId) } } 
-            })
+            } : {})
           }
         });
 
-        // B. ACTUALIZAR STOCK CONDICIONAL
-        // 🚀 Solo sumamos stock inmediatamente si la operación ya está APROBADA
-        // Si está 'SOLICITADO', el stock no se mueve hasta que el taller origen despache.
-        if (estado === "APROBADO") {
+        // B. ACTUALIZAR STOCK REAL (Solo si entra como APROBADO)
+        // Nota: Si es "SOLICITADO", el stock no se toca hasta que se reciba.
+        if (estadoFinal === "APROBADO") {
           await tx.producto.upsert({
             where: {
               costoMaestroId_tallerId: {
@@ -74,33 +76,100 @@ export const crearIngreso = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ 
-      message: estado === "SOLICITADO" ? "Pedido registrado correctamente" : "Stock actualizado con éxito", 
+      message: estadoFinal === "SOLICITADO" ? "Solicitud enviada al otro taller" : "Stock registrado", 
       data: resultado 
     });
 
   } catch (error) {
-    console.error("❌ ERROR EN OPERACIÓN LOGÍSTICA:", error);
-    res.status(500).json({ error: "Fallo en la transacción", details: error });
+    console.error("❌ ERROR EN CREAR INGRESO:", error);
+    res.status(500).json({ error: "Fallo al registrar el ingreso" });
   }
 };
 
+// 2. OBTENER HISTORIAL (Con sedes de origen para transferencias)
 export const obtenerIngresos = async (req: Request, res: Response) => {
+  const { tallerId } = req.query;
+
   try {
     const ingresos = await prisma.ingresoStock.findMany({
-      include: {
-        taller: true,        // 🚀 Traemos el nombre de la sede
-        costoMaestro: true,  // 🚀 Traemos el nombre y marca del repuesto
-        proveedor: true,     // 🚀 Traemos la razón social si existe
-        usuario: true        // 🚀 Quién hizo el movimiento
+      where: {
+        ...(tallerId ? { tallerId: Number(tallerId) } : {})
       },
-      orderBy: {
-        createdAt: 'desc'    // 🚀 Los más recientes primero
-      }
+      include: {
+        taller: true,        // Sede que recibe
+        tallerOrigen: true,  // 🚀 Sede que envía (Clave para transferencias)
+        costoMaestro: true,  // Datos del producto
+        proveedor: true,     
+        usuario: { select: { nombre: true } }
+      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { cantidad: 'desc' }
+      ]
     });
 
     res.json(ingresos);
   } catch (error) {
-    console.error("Error al obtener historial:", error);
-    res.status(500).json({ error: "No se pudo cargar el historial de ingresos" });
+    res.status(500).json({ error: "Error al cargar el historial" });
+  }
+};
+
+// 3. 🚀 NUEVO: RECIBIR TRANSFERENCIA (Confirmar llegada)
+// Esta es la función que llama el botón de "Confirmar Recepción" en el frontend
+export const actualizarEstadoIngreso = async (req: Request, res: Response) => {
+  const { id } = req.params; // ID del IngresoStock
+  const { nuevoEstado } = req.body; // Debería ser 'APROBADO'
+
+  try {
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1. Buscamos el ingreso actual
+      const ingreso = await tx.ingresoStock.findUnique({ 
+        where: { id: Number(id) } 
+      });
+
+      if (!ingreso) throw new Error("Movimiento no encontrado");
+
+      // 2. Si confirmamos recepción (Pasamos de EN CAMINO a APROBADO)
+      if (nuevoEstado === "APROBADO") {
+        // A. Sumamos stock al taller destino
+        await tx.producto.upsert({
+          where: {
+            costoMaestroId_tallerId: {
+              tallerId: ingreso.tallerId,
+              costoMaestroId: ingreso.costoMaestroId
+            }
+          },
+          update: { stockActual: { increment: ingreso.cantidad } },
+          create: {
+            tallerId: ingreso.tallerId,
+            costoMaestroId: ingreso.costoMaestroId,
+            stockActual: ingreso.cantidad
+          }
+        });
+
+        // B. 🔄 SINCRONIZACIÓN CON PEDIDOS
+        // Buscamos el pedido relacionado que está "DESPACHADO" y lo cerramos
+        await tx.pedido.updateMany({
+          where: {
+            costoMaestroId: ingreso.costoMaestroId,
+            tallerId: ingreso.tallerId,
+            tallerOrigenId: ingreso.tallerOrigenId,
+            estado: "DESPACHADO"
+          },
+          data: { estado: "ENTREGADO" }
+        });
+      }
+
+      // 3. Actualizamos el registro de ingreso
+      return await tx.ingresoStock.update({
+        where: { id: Number(id) },
+        data: { estado: nuevoEstado }
+      });
+    });
+
+    res.json({ message: "Recepción confirmada y stock actualizado", data: resultado });
+  } catch (error) {
+    console.error("❌ ERROR AL RECIBIR:", error);
+    res.status(500).json({ error: "No se pudo procesar la recepción" });
   }
 };

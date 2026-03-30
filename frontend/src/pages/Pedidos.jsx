@@ -1,309 +1,311 @@
 import { useState, useMemo, useEffect } from 'react'
 import Layout from '../components/layout/Layout'
 import { useAuth } from '../context/AuthContext'
-import { talleresMock, pedidosMock } from '../services/mockData'
+import api from '../api/axios' 
+import { toast } from 'react-hot-toast'
 
-/* ─── Sort Icon ──────────────────────────────────────────────────── */
+/* ─── COMPONENTES VISUALES ─────────────────────────────────────── */
 function SortIcon({ dir }) {
   return (
     <span style={{ opacity: dir ? 1 : 0.3, marginLeft: 4, display: 'inline-flex', flexDirection: 'column', gap: 1.5 }}>
-      <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-        <path d="M4 0L7.46 4.5H.54L4 0Z" fill={dir === 'asc' ? '#1a3a5c' : '#94a3b8'} />
-      </svg>
-      <svg width="8" height="5" viewBox="0 0 8 5" fill="none" style={{ transform: 'rotate(180deg)' }}>
-        <path d="M4 0L7.46 4.5H.54L4 0Z" fill={dir === 'desc' ? '#1a3a5c' : '#94a3b8'} />
-      </svg>
+      <svg width="8" height="5" viewBox="0 0 8 5" fill="none"><path d="M4 0L7.46 4.5H.54L4 0Z" fill={dir === 'asc' ? '#1a3a5c' : '#94a3b8'} /></svg>
+      <svg width="8" height="5" viewBox="0 0 8 5" fill="none" style={{ transform: 'rotate(180deg)' }}><path d="M4 0L7.46 4.5H.54L4 0Z" fill={dir === 'desc' ? '#1a3a5c' : '#94a3b8'} /></svg>
     </span>
   )
 }
 
-/* ─── EstadoPedidoBadge (lógica original) ────────────────────────── */
 function EstadoPedidoBadge({ estado }) {
   const config = {
-    'SOLICITADO':             { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe' },
-    'SOLICITADO POR CLIENTE': { bg: '#fff7ed', color: '#c2410c', dot: '#f97316', border: '#fed7aa' },
-    'SOLICITADO POR TALLER':  { bg: '#faf5ff', color: '#6d28d9', dot: '#8b5cf6', border: '#e9d5ff' },
-    'ENTREGADO':              { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', border: '#bbf7d0' },
+    // 🚀 CAMBIO: Ahora dice "SOLICITADO POR TALLER"
+    'PENDIENTE':  { bg: '#faf5ff', color: '#6d28d9', dot: '#8b5cf6', border: '#e9d5ff', label: 'SOLICITADO POR TALLER' },
+    'DESPACHADO': { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe', label: 'EN CAMINO' },
+    'ENTREGADO':  { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', border: '#bbf7d0', label: 'ENTREGADO' },
+    'RECHAZADO':  { bg: '#fef2f2', color: '#991b1b', dot: '#ef4444', border: '#fecaca', label: 'RECHAZADO' },
   }
-  const c = config[estado] || config['SOLICITADO']
+  
+  const c = config[estado] || config['PENDIENTE'];
+  
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
       style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}>
       <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-      {estado}
+      {c.label}
     </span>
-  )
+  );
 }
 
-/* ─── Main ───────────────────────────────────────────────────────── */
+/* ─── COMPONENTE PRINCIPAL ─────────────────────────────────────── */
 export default function Pedidos() {
   const { user } = useAuth()
-
-  /* ─── HOOKS (ORDEN ESTRICTO) ─── */
-  const [pedidos, setPedidos]     = useState(pedidosMock)
+  const [pedidos, setPedidos] = useState([])
+  const [talleres, setTalleres] = useState([])
   const [filtroTab, setFiltroTab] = useState('PENDIENTES')
-  const [search, setSearch]       = useState('')
-  const [sort, setSort]           = useState({ col: 'fecha', dir: 'desc' })
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState({ col: 'createdAt', dir: 'desc' })
+  const [loading, setLoading] = useState(true)
 
-  const userRol  = useMemo(() => user?.rol?.toUpperCase() || '', [user])
+  const userRol = useMemo(() => user?.rol?.toUpperCase() || '', [user])
   const esGlobal = userRol === 'ADMIN' || userRol === 'GERENTE'
 
-  const tabsTalleres = useMemo(() => {
-    if (esGlobal) return [{ id: 'todos', nombre: 'Todos' }, ...talleresMock]
-    return talleresMock.filter(t => t.id === user?.tallerId)
-  }, [esGlobal, user])
+  // 🚀 1. Carga inicial de datos
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [resT, resP] = await Promise.all([
+          api.get('/talleres'),
+          api.get(`/pedidos?tallerId=${esGlobal ? '' : user?.tallerId}&rol=${userRol}`)
+        ]);
+        setTalleres(resT.data);
+        setPedidos(resP.data);
+      } catch (error) {
+        console.error("Error sincronizando:", error);
+        toast.error("Error de conexión");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user) fetchData();
+  }, [user, userRol, esGlobal]);
 
+  // 🚀 2. Lógica de Pestañas (SOLO PARA ADMIN)
+  const tabsTalleres = useMemo(() => {
+    if (!esGlobal) return []; // Si no es admin, no hay pestañas
+    return [{ id: 'todos', nombre: 'Vista Global' }, ...talleres];
+  }, [esGlobal, talleres]);
+
+  // Si es taller, la tab activa es siempre su tallerId
   const [tabTallerActiva, setTabTallerActiva] = useState(esGlobal ? 'todos' : user?.tallerId)
 
-  useEffect(() => { setSearch('') }, [tabTallerActiva])
+  // Sincronizar tab activa si el usuario cambia (seguridad)
+  useEffect(() => {
+    if (user && !esGlobal) setTabTallerActiva(user.tallerId);
+  }, [user, esGlobal]);
 
-  /* ─── FILTRADO LOGÍSTICO (lógica original) ─── */
+  // 🚀 3. Filtrado de la Tabla
   const filtrados = useMemo(() => {
     let d = pedidos.filter(p => {
-      const matchTaller = tabTallerActiva === 'todos' || String(p.tallerId) === String(tabTallerActiva)
-      const matchEstado = filtroTab === 'PENDIENTES' ? p.estado !== 'ENTREGADO' : p.estado === 'ENTREGADO'
-      const q           = search.toLowerCase()
-      const matchSearch = p.referencia.toLowerCase().includes(q) || p.repuesto.toLowerCase().includes(q)
-      return matchTaller && matchEstado && matchSearch
-    })
-    d.sort((a, b) => sort.dir === 'asc'
-      ? String(a[sort.col] ?? '').localeCompare(String(b[sort.col] ?? ''))
-      : String(b[sort.col] ?? '').localeCompare(String(a[sort.col] ?? ''))
-    )
-    return d
+      // Filtro de Sede
+      const matchTaller = tabTallerActiva === 'todos' || 
+                          Number(p.tallerOrigenId) === Number(tabTallerActiva) || 
+                          Number(p.tallerId) === Number(tabTallerActiva);
+      
+      // Filtro de Proceso (Pendientes vs Historial)
+      const matchEstado = filtroTab === 'PENDIENTES' 
+        ? (p.estado === 'PENDIENTE' || p.estado === 'DESPACHADO') 
+        : (p.estado === 'ENTREGADO' || p.estado === 'RECHAZADO');
+
+      // Buscador
+      const q = search.toLowerCase();
+      const matchSearch = p.codigo.toLowerCase().includes(q) || 
+                          (p.costoMaestro?.nombre || '').toLowerCase().includes(q) ||
+                          (p.placa || '').toLowerCase().includes(q);
+
+      return matchTaller && matchEstado && matchSearch;
+    });
+
+    return d.sort((a, b) => {
+      const valA = a[sort.col] || '';
+      const valB = b[sort.col] || '';
+      return sort.dir === 'asc' ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+    });
   }, [pedidos, tabTallerActiva, filtroTab, search, sort])
 
-  /* ─── SEGURIDAD (DESPUÉS DE LOS HOOKS) ─── */
-  if (!user) return (
-    <Layout tituloNavbar="Verificando...">
-      <div className="p-20 text-center animate-pulse font-bold text-gray-300 text-xs uppercase tracking-widest">Cargando...</div>
-    </Layout>
-  )
+  // 🚀 4. Handlers de Acción
+  const handleCambiarEstado = async (id, nuevoEstado) => {
+    if (!window.confirm(`¿Confirmar ${nuevoEstado} de este repuesto?`)) return;
 
-  /* ─── HANDLERS Y STATS ─── */
-  const toggleSort = col => setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
+    try {
+      // 1. Enviamos la actualización
+      await api.patch(`/pedidos/${id}/estado`, { 
+        nuevoEstado,
+        usuarioId: user.id 
+      });
+      
+      // 2. Si el patch funcionó, mostramos el éxito
+      toast.success("¡Operación realizada con éxito!");
 
-  const handleEntregar = id => {
-    if (window.confirm('¿Confirmar salida física del repuesto de este taller?')) {
-      setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: 'ENTREGADO' } : p))
+      // 3. Intentamos refrescar, pero de forma segura
+      try {
+        await fetchData(); 
+      } catch (err) {
+        console.warn("La base de datos actualizó, pero hubo un error al recargar la vista.");
+      }
+
+    } catch (error) {
+      // 4. Solo si el PATCH falla de verdad, mostramos el rojo
+      console.error(error);
+      toast.error("No se pudo procesar el cambio de estado");
     }
-  }
+  };
 
-  const pendientesCount = pedidos.filter(x =>
-    x.estado !== 'ENTREGADO' && (tabTallerActiva === 'todos' || String(x.tallerId) === String(tabTallerActiva))
-  ).length
+  const handleRechazar = async (id) => {
+    const motivo = window.prompt("Indica el motivo del rechazo para informar a la otra sede:");
+    if (!motivo) return;
+    try {
+      await api.patch(`/pedidos/${id}/estado`, { nuevoEstado: 'RECHAZADO', motivoRechazo: motivo });
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: 'RECHAZADO', observaciones: motivo } : p));
+      toast.success("Pedido rechazado");
+    } catch (error) {
+      toast.error("Error al procesar rechazo");
+    }
+  };
 
-  const entregadosCount = pedidos.filter(x =>
-    x.estado === 'ENTREGADO' && (tabTallerActiva === 'todos' || String(x.tallerId) === String(tabTallerActiva))
-  ).length
+  // 🚀 5. Stats Reactivas
+  const statCount = (type) => {
+    return pedidos.filter(p => {
+      const matchTaller = tabTallerActiva === 'todos' || Number(p.tallerOrigenId) === Number(tabTallerActiva);
+      return matchTaller && (type === 'PENDIENTE' ? p.estado === 'PENDIENTE' : p.estado === 'ENTREGADO');
+    }).length;
+  };
 
-  const sinStockCount = filtrados.filter(p => p.stockTaller < p.cantidad).length
-
-  const TH = ({ col, label, width, center }) => (
-    <th onClick={() => col && toggleSort(col)}
-      className="px-4 py-3 select-none"
-      style={{ width, fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', cursor: col ? 'pointer' : 'default', whiteSpace: 'nowrap', textAlign: center ? 'center' : 'left' }}>
-      <span className="inline-flex items-center">
-        {label}{col && <SortIcon dir={sort.col === col ? sort.dir : null} />}
-      </span>
-    </th>
-  )
+  if (loading) return <Layout tituloNavbar="Dr. Motors"><div className="p-20 text-center animate-pulse text-[10px] font-black text-slate-300 uppercase tracking-widest">Sincronizando Almacén...</div></Layout>
 
   return (
     <Layout tituloNavbar="Gestión de Almacén y Pedidos">
       <div className="p-4 sm:p-6 min-h-screen" style={{ background: '#f6f8fb' }}>
-
-        {/* ── Header responsive ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        
+        {/* HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: '#1a3a5c' }}>Despacho de Repuestos</h1>
-            <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Control de salidas de inventario por taller</p>
+            <h1 className="text-2xl font-black tracking-tighter text-[#1a3a5c]">Despacho de Repuestos</h1>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Logística de transferencia entre sedes</p>
           </div>
-          {/* Buscador en header */}
-          <div className="relative w-full sm:w-72">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" fill="none" stroke="#94a3b8" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar placa o repuesto…"
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl outline-none transition-all"
-              style={{ border: '1px solid #e2e8f0', background: '#fff', color: '#1e293b', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-              onFocus={e => { e.target.style.border = '1px solid #1a3a5c'; e.target.style.boxShadow = '0 0 0 3px rgba(26,58,92,0.08)' }}
-              onBlur={e => { e.target.style.border = '1px solid #e2e8f0'; e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)' }} />
+          <div className="relative w-full sm:w-80">
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar pedido, placa o repuesto..." className="w-full pl-4 pr-3 py-3 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm focus:border-[#1a3a5c] transition-all outline-none" />
           </div>
         </div>
 
-        {/* ── Stat cards responsive ── */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        {/* 🚀 SELECTOR DE SEDE (Solo visible para ADMIN) */}
+        {esGlobal ? (
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+            {tabsTalleres.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTabTallerActiva(t.id)}
+                className={`px-6 py-2.5 text-[11px] font-black rounded-xl uppercase tracking-wider transition-all shadow-sm border ${
+                  String(tabTallerActiva) === String(t.id)
+                    ? 'bg-[#1a3a5c] text-white border-[#1a3a5c] shadow-blue-900/20'
+                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {t.nombre}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-8">
+            <span className="px-5 py-2.5 bg-white text-[#1a3a5c] rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-100 shadow-sm">
+              📍 Sede actual: {talleres.find(t => Number(t.id) === Number(user?.tallerId))?.nombre || 'Mi Taller'}
+            </span>
+          </div>
+        )}
+
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Pendientes', value: pendientesCount, icon: '⏳', accent: pendientesCount > 0 ? '#b45309' : '#94a3b8' },
-            { label: 'Entregados', value: entregadosCount, icon: '✅', accent: '#15803d' },
-            { label: 'Sin stock',  value: sinStockCount,   icon: '⚠️', accent: sinStockCount  > 0 ? '#dc2626' : '#94a3b8' },
+            { label: 'Pendientes', value: statCount('PENDIENTE'), icon: '⏳', accent: '#b45309' },
+            { label: 'Entregados', value: statCount('ENTREGADO'), icon: '✅', accent: '#15803d' },
+            { label: 'Alertas', value: 0, icon: '⚠️', accent: '#94a3b8' },
           ].map(s => (
-            <div key={s.label} className="rounded-2xl p-4 bg-white"
-              style={{ border: '1px solid #e9edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</span>
-                <span style={{ fontSize: 16 }}>{s.icon}</span>
+            <div key={s.label} className="rounded-3xl p-5 bg-white border border-slate-100 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                <span className="text-lg">{s.icon}</span>
               </div>
-              <p className="text-3xl font-bold tracking-tight" style={{ color: s.accent }}>{s.value}</p>
+              <p className="text-4xl font-black" style={{ color: s.accent }}>{s.value}</p>
             </div>
           ))}
         </div>
 
-        {/* ── Tabs talleres (scroll horizontal en móvil) ── */}
-        {tabsTalleres.length > 1 && (
-          <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-1">
-            {tabsTalleres.map(t => {
-              const active = String(tabTallerActiva) === String(t.id)
-              return (
-                <button key={t.id} onClick={() => setTabTallerActiva(t.id)}
-                  className="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex-shrink-0"
-                  style={{ background: active ? '#1a3a5c' : '#fff', color: active ? '#fff' : '#64748b', border: active ? '1px solid #1a3a5c' : '1px solid #e2e8f0', boxShadow: active ? '0 2px 8px rgba(26,58,92,0.18)' : 'none' }}>
-                  {t.nombre}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── Tabs proceso ── */}
-        <div className="flex gap-1 mb-4 p-1 rounded-xl w-fit"
-          style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
-          {[
-            { key: 'PENDIENTES', label: `Solicitudes (${pendientesCount})` },
-            { key: 'ENTREGADOS', label: 'Historial' },
-          ].map(tab => (
-            <button key={tab.key} onClick={() => setFiltroTab(tab.key)}
-              className="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
-              style={{ background: filtroTab === tab.key ? '#1a3a5c' : 'transparent', color: filtroTab === tab.key ? '#fff' : '#64748b' }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Tabla ── */}
-        <div className="bg-white rounded-2xl overflow-hidden"
-          style={{ border: '1px solid #e9edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-
-          {/* Contador toolbar */}
-          <div className="flex items-center justify-between px-5 py-3"
-            style={{ borderBottom: '1px solid #f1f5f9', background: '#fafcff' }}>
-            <span className="text-xs font-semibold" style={{ color: '#94a3b8' }}>
-              {filtrados.length} {filtrados.length === 1 ? 'registro' : 'registros'}
-            </span>
+        {/* TABLA PRINCIPAL */}
+        <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
+          {/* Sub-tabs Proceso */}
+          <div className="flex gap-1 p-2 bg-slate-50/50 border-b border-slate-100">
+            {['PENDIENTES', 'HISTORIAL'].map(tab => (
+              <button key={tab} onClick={() => setFiltroTab(tab)} className={`px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${filtroTab === tab ? 'bg-white text-[#1a3a5c] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                {tab === 'PENDIENTES' ? `Solicitudes (${filtrados.length})` : 'Historial'}
+              </button>
+            ))}
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 620 }}>
+            <table className="w-full text-left">
               <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <TH col="referencia" label="Placa / Fecha"         width="17%" />
-                  <TH col="repuesto"   label="Repuesto / Solicitante" width="26%" />
-                  <TH col="cantidad"   label="Cant."                 width="8%"  center />
-                  <TH                  label="Stock en Taller"       width="16%" center />
-                  <TH col="estado"     label="Estado"                width="20%" center />
-                  <TH                  label="Acción"                width="10%" center />
+                <tr className="bg-slate-50/50">
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase">Cód / Fecha</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase">Repuesto / Solicitante</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase text-center">Cant.</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase text-center">Estado</th>
+                  <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase text-center">Acción</th>
                 </tr>
               </thead>
-              <tbody>
-                {filtrados.length > 0 ? filtrados.map(p => {
-                  const tallerNom      = talleresMock.find(t => t.id === p.tallerId)?.nombre || '—'
-                  const sinStock       = p.stockTaller < p.cantidad
-                  const esTransferencia = p.tallerSolicitanteId && String(p.tallerSolicitanteId) !== String(p.tallerId)
-
-                  return (
-                    <tr key={p.id} style={{ borderTop: '1px solid #f1f5f9', transition: 'background .1s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-
-                      {/* Placa + fecha */}
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-bold" style={{ color: '#1a3a5c' }}>{p.referencia}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>
-                          {new Date(p.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              <tbody className="divide-y divide-slate-50">
+                {filtrados.length > 0 ? filtrados.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-5">
+                      <p className="text-xs font-black text-slate-800">{p.codigo}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(p.createdAt).toLocaleDateString()}</p>
+                    </td>
+                    <td className="px-4 py-5">
+                      <p className="text-xs font-black text-slate-800 uppercase">{p.costoMaestro?.nombre}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {/* 🔵 Aquí forzamos el color azul y que sea el campo 'solicitante' el que se muestre */}
+                        <p className="text-[10px] font-bold text-blue-500 uppercase">
+                          {p.solicitante}
                         </p>
-                      </td>
-
-                      {/* Repuesto + solicitante */}
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{p.repuesto}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>{p.solicitante}</p>
-                          {esTransferencia && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                              style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' }}>
-                              TALLER {p.tallerSolicitanteId}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Cantidad */}
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-sm font-bold"
-                          style={{ background: '#f1f5f9', color: '#1a3a5c' }}>
-                          {p.cantidad}
-                        </span>
-                      </td>
-
-                      {/* Stock taller */}
-                      <td className="px-4 py-3 text-center">
-                        <p className="text-xs font-semibold mb-1" style={{ color: '#2a5f94' }}>{tallerNom}</p>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                          style={sinStock
-                            ? { background: '#fff5f5', color: '#dc2626', border: '1px solid #fecaca' }
-                            : { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: sinStock ? '#dc2626' : '#22c55e', flexShrink: 0 }} />
-                          {p.stockTaller} unid.
-                        </span>
-                      </td>
-
-                      {/* Estado */}
-                      <td className="px-4 py-3 text-center">
-                        <EstadoPedidoBadge estado={p.estado} />
-                      </td>
-
-                      {/* Acción */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          {p.estado !== 'ENTREGADO' && (
-                            <button onClick={() => handleEntregar(p.id)} disabled={sinStock}
-                              title={sinStock ? 'Sin stock suficiente' : 'Confirmar entrega'}
-                              className="flex items-center justify-center rounded-lg transition-all"
-                              style={{
-                                width: 28, height: 28,
-                                background: 'transparent',
-                                color: sinStock ? '#cbd5e1' : '#94a3b8',
-                                border: `1px solid ${sinStock ? '#e2e8f0' : '#e2e8f0'}`,
-                                cursor: sinStock ? 'not-allowed' : 'pointer',
-                              }}
-                              onMouseEnter={e => { if (!sinStock) { e.currentTarget.style.background = '#15803d'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#15803d' } }}
-                              onMouseLeave={e => { if (!sinStock) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#e2e8f0' } }}>
-                              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <polyline points="20 6 9 17 4 12" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-5 text-center">
+                      <span className="px-3 py-1 bg-slate-100 rounded-lg text-xs font-black text-[#1a3a5c]">{p.cantidad}</span>
+                    </td>
+                    <td className="px-4 py-5 text-center">
+                      <EstadoPedidoBadge estado={p.estado} />
+                    </td>
+                    <td className="px-4 py-5">
+                      <div className="flex justify-center gap-2">
+                        
+                        {/* 🚀 SI ESTÁ SOLICITADO: Jhon ve el botón de Despachar y Rechazar */}
+                        {p.estado === 'PENDIENTE' && (
+                          <>
+                            {/* BOTÓN DESPACHAR: Este es el que cambia a "EN CAMINO" */}
+                            <button 
+                              onClick={() => handleCambiarEstado(p.id, 'DESPACHADO')}
+                              className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                              title="Despachar Repuesto"
+                            >
+                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <polyline points="20 6 9 17 4 12"/>
                               </svg>
                             </button>
-                          )}
-                          <button title="Ver detalle"
-                            className="flex items-center justify-center rounded-lg transition-all"
-                            style={{ width: 28, height: 28, color: '#94a3b8', border: '1px solid #e2e8f0', background: 'transparent' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#1a3a5c'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#1a3a5c' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#e2e8f0' }}>
-                            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                }) : (
+
+                            {/* BOTÓN RECHAZAR */}
+                            <button 
+                              onClick={() => handleRechazar(p.id)}
+                              className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                              title="Rechazar Pedido"
+                            >
+                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            </button>
+                          </>
+                        )}
+
+                        {/* BOTÓN VER DETALLES (El ojo que ya tienes) */}
+                        <button className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-200 transition-all">
+                          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )) : (
                   <tr>
-                    <td colSpan={6} className="py-14 text-center" style={{ color: '#94a3b8' }}>
-                      <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
-                      <p className="text-sm font-medium">No hay solicitudes</p>
-                      <p className="text-xs mt-1">Intenta con otros filtros o cambia de taller</p>
+                    <td colSpan={5} className="py-24 text-center">
+                      <p className="text-4xl mb-3">📦</p>
+                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Sin movimientos registrados</p>
                     </td>
                   </tr>
                 )}
