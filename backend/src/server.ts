@@ -10,6 +10,10 @@ import rentabilidadRoutes from './routes/rentabilidadRoutes';
 import costoMaestroRoutes from './routes/costoMaestroRoutes';
 import ingresosRoutes from './routes/ingresosRoutes';
 import pedidoRoutes from './routes/pedidoRoutes';
+import servicioRoutes from './routes/servicioRoutes';
+import sectorRoutes from './routes/sectorRoutes';
+import vehiculoRoutes from './routes/vehiculoRoutes';
+import clienteRoutes from './routes/clienteRoutes';
 
 dotenv.config();
 
@@ -33,6 +37,10 @@ app.use('/api/rentabilidad', rentabilidadRoutes);
 app.use('/api/costos-maestros', costoMaestroRoutes);
 app.use('/api/ingresos', ingresosRoutes);
 app.use('/api/pedidos', pedidoRoutes); 
+app.use('/api/servicios', servicioRoutes); 
+app.use('/api/sectores', sectorRoutes);
+app.use('/api/vehiculos', vehiculoRoutes); 
+app.use('/api/clientes', clienteRoutes);
 
 app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);

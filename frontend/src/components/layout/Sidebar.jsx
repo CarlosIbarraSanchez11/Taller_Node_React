@@ -182,7 +182,7 @@ function Sidebar({ collapsed }) {
 
             <NavLink
               to="/ingresos"
-              title="Ingresos"
+              title="Movimientos"
               className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 text-sm transition-colors ${collapsed ? 'justify-center' : ''}`}
               style={({ isActive }) => ({
                 background: isActive ? '#2a5f94' : 'transparent',
@@ -197,7 +197,7 @@ function Sidebar({ collapsed }) {
                 <path d="M9 16l3 3 3-3" />
                 <path d="M3 8h18" />
               </svg>
-              {!collapsed && <span>Ingresos</span>}
+              {!collapsed && <span>Movimientos</span>}
             </NavLink>
 
             <NavLink

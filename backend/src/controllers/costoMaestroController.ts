@@ -46,45 +46,69 @@ export const getCostosMaestros = async (_req: Request, res: Response) => {
 
 // 2. GUARDAR O EDITAR (Upsert por Identidad Única)
 export const upsertCostoMaestro = async (req: Request, res: Response) => {
+  // 1. Recibimos el 'id' también desde el frontend
   const { 
-    categoria, nombre, marca, medida, 
-    precioCompra, tiempoHH, costoHH, cantTecnicos, precioVenta 
+    id, categoria, nombre, marca, medida, 
+    costoInsumo, hh, costoHH, tecnicos, precioVenta 
   } = req.body;
 
   try {
-    const registro = await prisma.costoMaestro.upsert({
-      where: {
-        nombre_marca_medida: {
-          nombre: nombre.toUpperCase(),
-          marca: marca.toUpperCase(),
-          medida: medida
+    let registro;
+
+    // 🚀 LÓGICA INTELIGENTE:
+    // Si viene un ID, significa que el usuario hizo clic en "Editar",
+    // así que actualizamos ESE registro específico sin importar si cambió la medida.
+    if (id) {
+      registro = await prisma.costoMaestro.update({
+        where: { id: Number(id) },
+        data: {
+          categoria: categoria.toUpperCase(),
+          nombre: nombre.toUpperCase().trim(),
+          marca: marca.toUpperCase().trim(),
+          medida: medida,
+          precioCompra: Number(costoInsumo) || 0,
+          tiempoHH:     Number(hh) || 0,
+          costoHH:      Number(costoHH) || 0,
+          cantTecnicos: Number(tecnicos) || 0,
+          precioVenta:  Number(precioVenta) || 0
         }
-      },
-      update: {
-        categoria,
-        // 🚀 LIMPIEZA: Si es NaN, guardamos 0
-        precioCompra: Number(precioCompra) || 0,
-        tiempoHH: Number(tiempoHH) || 0,
-        costoHH: Number(costoHH) || 0,
-        cantTecnicos: Number(cantTecnicos) || 0,
-        precioVenta: Number(precioVenta) || 0
-      },
-      create: {
-        categoria,
-        nombre: nombre.toUpperCase(),
-        marca: marca.toUpperCase(),
-        medida: medida,
-        // 🚀 LIMPIEZA: Si es NaN, guardamos 0
-        precioCompra: Number(precioCompra) || 0,
-        tiempoHH: Number(tiempoHH) || 0,
-        costoHH: Number(costoHH) || 0,
-        cantTecnicos: Number(cantTecnicos) || 0,
-        precioVenta: Number(precioVenta) || 0
-      }
-    });
+      });
+    } 
+    // Si NO viene ID, es un producto nuevo o un intento de creación
+    else {
+      registro = await prisma.costoMaestro.upsert({
+        where: {
+          nombre_marca_medida: {
+            nombre: nombre.toUpperCase().trim(),
+            marca: marca.toUpperCase().trim(),
+            medida: medida
+          }
+        },
+        update: {
+          categoria: categoria.toUpperCase(),
+          precioCompra: Number(costoInsumo) || 0,
+          tiempoHH:     Number(hh) || 0,
+          costoHH:      Number(costoHH) || 0,
+          cantTecnicos: Number(tecnicos) || 0,
+          precioVenta:  Number(precioVenta) || 0
+        },
+        create: {
+          categoria: categoria.toUpperCase(),
+          nombre: nombre.toUpperCase().trim(),
+          marca: marca.toUpperCase().trim(),
+          medida: medida,
+          precioCompra: Number(costoInsumo) || 0,
+          tiempoHH:     Number(hh) || 0,
+          costoHH:      Number(costoHH) || 0,
+          cantTecnicos: Number(tecnicos) || 0,
+          precioVenta:  Number(precioVenta) || 0
+        }
+      });
+    }
 
     res.json(registro);
   } catch (error) {
-    handlePrismaError(error, res);
+    console.error("Error en upsert:", error);
+    res.status(500).json({ error: "Error al guardar el registro maestro" });
   }
 };

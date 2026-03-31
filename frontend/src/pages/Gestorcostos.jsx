@@ -42,6 +42,7 @@ const inputCls = "w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg
 /* ─── Modal: Formulario Maestro ─── */
 function ModalProducto({ item, matriz, costosExistentes, onClose, onSave }) {
   const [formData, setFormData] = useState({
+    id: item?.id || null, 
     categoria: item?.categoria || '',
     nombre: item?.nombre || '',
     marca: item?.marca || '',
@@ -52,7 +53,6 @@ function ModalProducto({ item, matriz, costosExistentes, onClose, onSave }) {
     tecnicos: item?.tecnicos || 1,
   })
 
-  // 🔍 DETECTAR DUPLICADO EN TIEMPO REAL
   const yaExiste = useMemo(() => {
     if (item) return false 
     return costosExistentes.some(c => 
@@ -62,20 +62,18 @@ function ModalProducto({ item, matriz, costosExistentes, onClose, onSave }) {
     )
   }, [formData.nombre, formData.marca, formData.medida, costosExistentes, item])
 
+  // 🚀 ¡REVISA QUE ESTA LÍNEA ESTÉ AQUÍ! (Línea 150 aprox)
   const pvs = calcularPrecioSugerido(formData.costoInsumo, formData.hh, formData.costoHH, formData.tecnicos, matriz)
 
-  // 🚀 Lógica de envío con limpieza (Uppercase + Trim)
   const handleSubmit = (e) => {
     e.preventDefault()
-    
     const dataLimpia = {
       ...formData,
       nombre: formData.nombre.trim().toUpperCase(),
       marca: formData.marca.trim().toUpperCase(),
       categoria: formData.categoria.trim().toUpperCase(),
     }
-    
-    onSave(dataLimpia, yaExiste)
+    onSave(dataLimpia, !!item?.id) 
   }
 
   return (
@@ -96,12 +94,12 @@ function ModalProducto({ item, matriz, costosExistentes, onClose, onSave }) {
           <label className="block mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría</label>
           <select className={inputCls} value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} required>
             <option value="">Seleccionar...</option>
-            <option value="Aceites">ACEITES</option>
-            <option value="Filtros">FILTROS</option>
-            <option value="Frenos">FRENOS</option>
-            <option value="Suspensión">SUSPENSIÓN</option>
-            <option value="Baterías">BATERÍAS</option>
-            <option value="Iluminación">ILUMINACIÓN</option>
+            <option value="ACEITES">ACEITES</option>
+            <option value="FILTROS">FILTROS</option>
+            <option value="FRENOS">FRENOS</option>
+            <option value="SUSPENSIÓN">SUSPENSIÓN</option>
+            <option value="BATERÍAS">BATERÍAS</option>
+            <option value="ILUMINACIÓN">ILUMINACIÓN</option>
           </select>
         </div>
         <div className="col-span-1">
@@ -192,16 +190,29 @@ export default function GestorCostos() {
 
   useEffect(() => { loadData() }, [])
 
-  const handleSave = async (dataLimpia, esActualizacion) => {
-    const toastId = toast.loading('Procesando cambios...');
+  const handleSave = async (dataLimpia, esEdicionDirecta) => {
+    const toastId = toast.loading('Sincronizando con Dr. Motors...');
     try {
-      const pvs = calcularPrecioSugerido(dataLimpia.costoInsumo, dataLimpia.hh, dataLimpia.costoHH, dataLimpia.tecnicos, matriz)
-      await api.post('/costos-maestros/save', { ...dataLimpia, precioVenta: pvs })
+      // ✅ Forzar tipos numéricos
+      const payload = {
+        ...dataLimpia,
+        costoInsumo: Number(dataLimpia.costoInsumo),
+        hh:          Number(dataLimpia.hh),
+        costoHH:     Number(dataLimpia.costoHH),
+        tecnicos:    Number(dataLimpia.tecnicos),
+      }
+      const pvs = calcularPrecioSugerido(
+        payload.costoInsumo, payload.hh, payload.costoHH, payload.tecnicos, matriz
+      )
+      await api.post('/costos-maestros/save', { ...payload, precioVenta: pvs })
       
       toast.dismiss(toastId);
       
-      if (esActualizacion) {
-        toast('♻️ Catálogo Actualizado', { icon: '🔄', style: { borderRadius: '10px', background: '#334155', color: '#fff' } });
+      if (esEdicionDirecta) {
+        toast('♻️ Registro Actualizado', { 
+          icon: '🔄', 
+          style: { borderRadius: '10px', background: '#334155', color: '#fff' } 
+        });
       } else {
         toast.success('🚀 Producto creado correctamente');
       }
@@ -210,7 +221,7 @@ export default function GestorCostos() {
       setModal({ open: false, item: null })
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error('Error al guardar el registro');
+      toast.error('Error al guardar en la base de datos');
     }
   }
 

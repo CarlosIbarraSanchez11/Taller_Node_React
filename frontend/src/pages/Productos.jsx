@@ -43,7 +43,8 @@ function FormInventario({ form, setForm, maestros, talleres, onSubmit, isEdit, e
   const [nuevaIdentidad, setNuevaIdentidad] = useState({
     nombre: '', 
     marca: '', 
-    medida: 'Unidad'
+    medida: 'Unidad',
+    categoria: 'ACEITES' // 🚀 Agregamos esto
   });
 
   const maestrosFiltrados = useMemo(() => {
@@ -56,30 +57,55 @@ function FormInventario({ form, setForm, maestros, talleres, onSubmit, isEdit, e
 
   // Lógica para crear identidad desde aquí
   const handleCrearMaestroRapido = async () => {
-    if (!nuevaIdentidad.nombre) return toast.error("El nombre es obligatorio");
-    
-    const tid = toast.loading("Creando identidad...");
-    const categoriaReal = (!filtroCat || filtroCat === 'TODOS') ? 'Aceites' : filtroCat;
+    // 1. Validaciones básicas
+    const nombreLimpio = nuevaIdentidad.nombre?.trim().toUpperCase();
+    const marcaLimpia = (nuevaIdentidad.marca || 'GENERICO').trim().toUpperCase();
+
+    if (!nombreLimpio) return toast.error("El nombre es obligatorio");
+
+    // 2. 🛡️ Validación de Duplicados (Evita errores de SQL antes de enviar)
+    const existe = maestros.find(m => 
+      m.nombre.toUpperCase() === nombreLimpio && 
+      m.marca.toUpperCase() === marcaLimpia &&
+      m.medida === nuevaIdentidad.medida
+    );
+
+    if (existe) {
+      toast.error("Este repuesto ya existe en el catálogo global.");
+      setForm({ ...form, costoMaestroId: existe.id }); // Lo seleccionamos automáticamente
+      setModoCrear(false);
+      return;
+    }
+
+    const tid = toast.loading("Guardando identidad en el catálogo...");
 
     try {
+      // 3. 🚀 Envío con los nombres de variables que el Backend espera
       const res = await api.post('/costos-maestros/save', {
-        nombre: nuevaIdentidad.nombre.trim().toUpperCase(),
-        marca: (nuevaIdentidad.marca || 'GENERICO').trim().toUpperCase(),
+        nombre: nombreLimpio,
+        marca: marcaLimpia,
         medida: nuevaIdentidad.medida || 'Unidad',
-        categoria: categoriaReal,
-        // 🚀 ENVIAMOS NÚMEROS REALES, NO STRINGS NI VACÍOS
-        precioCompra: 0,
-        tiempoHH: 0,
+        categoria: nuevaIdentidad.categoria.toUpperCase(), // 👈 Categoría seleccionada en el modal
+        costoInsumo: 0,
+        hh: 0,
         costoHH: 0,
-        cantTecnicos: 1,
+        tecnicos: 1,
         precioVenta: 0
       });
 
+      // 4. ✨ Sincronización y Limpieza
       await refreshMaestros(); 
-      setForm({ ...form, costoMaestroId: res.data.id }); 
+      
+      // Seteamos el ID del nuevo producto en el formulario principal
+      setForm(prev => ({ ...prev, costoMaestroId: res.data.id })); 
+      
+      // Reseteamos el estado de creación para la próxima vez
+      setNuevaIdentidad({ nombre: '', marca: '', medida: 'Unidad', categoria: 'ACEITES' });
       setModoCrear(false);
-      toast.success("Identidad creada", { id: tid });
+      
+      toast.success("¡Identidad creada y vinculada!", { id: tid });
     } catch (err) {
+      console.error(err);
       toast.error("Error al procesar la operación", { id: tid });
     }
   };
@@ -88,27 +114,47 @@ function FormInventario({ form, setForm, maestros, talleres, onSubmit, isEdit, e
     <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
       <p className="text-[10px] font-black text-blue-600 uppercase">Nuevo Repuesto para el Catálogo</p>
       <div className="grid grid-cols-2 gap-3">
+        {/* 🚀 CATEGORÍA (NUEVO) */}
+        <div className="col-span-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase">Categoría</label>
+          <select className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 font-bold" 
+            value={nuevaIdentidad.categoria} 
+            onChange={e => setNuevaIdentidad({...nuevaIdentidad, categoria: e.target.value})}>
+            {CATEGORIAS.map(cat => (
+              <option key={cat} value={cat.toUpperCase()}>{cat.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="col-span-2">
           <label className="text-[10px] font-black text-slate-400 uppercase">Nombre</label>
-          <input className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 uppercase" 
-            value={nuevaIdentidad.nombre} onChange={e => setNuevaIdentidad({...nuevaIdentidad, nombre: e.target.value.toUpperCase()})} placeholder="EJ: FILTRO ACEITE" />
+          <input className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 uppercase font-bold" 
+            value={nuevaIdentidad.nombre} 
+            onChange={e => setNuevaIdentidad({...nuevaIdentidad, nombre: e.target.value.toUpperCase()})} 
+            placeholder="EJ: FILTRO ACEITE" />
         </div>
+
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase">Marca</label>
-          <input className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 uppercase" 
-            value={nuevaIdentidad.marca} onChange={e => setNuevaIdentidad({...nuevaIdentidad, marca: e.target.value.toUpperCase()})} placeholder="EJ: TOYOTA" />
+          <input className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 uppercase font-bold" 
+            value={nuevaIdentidad.marca} 
+            onChange={e => setNuevaIdentidad({...nuevaIdentidad, marca: e.target.value.toUpperCase()})} 
+            placeholder="EJ: TOYOTA" />
         </div>
+
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase">U. Medida</label>
-          <select className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50" 
-            value={nuevaIdentidad.medida} onChange={e => setNuevaIdentidad({...nuevaIdentidad, medida: e.target.value})}>
+          <select className="w-full px-4 py-2 text-sm rounded-xl border bg-slate-50 font-bold" 
+            value={nuevaIdentidad.medida} 
+            onChange={e => setNuevaIdentidad({...nuevaIdentidad, medida: e.target.value})}>
             {MEDIDAS.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
           </select>
         </div>
       </div>
+      
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={() => setModoCrear(false)} className="flex-1 py-3 text-xs font-bold text-slate-400 uppercase">Cancelar</button>
-        <button type="button" onClick={handleCrearMaestroRapido} className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase">Guardar en Catálogo</button>
+        <button type="button" onClick={handleCrearMaestroRapido} className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-100">Guardar en Catálogo</button>
       </div>
     </div>
   )
@@ -350,9 +396,11 @@ export default function Productos() {
                     </td>
                     <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">{maestro.medida}</td>
                     {tabSede === 'todos' && (
-                       <td className="px-6 py-4 text-center">
-                          <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[9px] font-black uppercase">{p.taller?.nombre}</span>
-                       </td>
+                      <td className="px-6 py-4 text-center">
+                          <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[9px] font-black uppercase">
+                            {p.taller?.nombre || `Taller ${p.tallerId}`} 
+                          </span>
+                      </td>
                     )}
                     <td className="px-6 py-4 text-center">
                        <button onClick={() => { setForm(p); setModal({ open: true, item: p }) }} className="p-2 text-slate-300 hover:text-slate-900 transition-colors">
