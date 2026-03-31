@@ -73,7 +73,19 @@ export const registrarClienteYVehiculo = async (req: Request, res: Response) => 
 export const getClientes = async (req: Request, res: Response) => {
   try {
     const clientes = await prisma.cliente.findMany({
-      include: { vehiculos: true },
+      include: {
+        vehiculos: {
+          include: {
+            citas: {
+              where: { estado: 'PENDIENTE' },
+              include: {
+                servicio: true, // 👈 ESTO TRAE: especialidad, nivel, etc.
+                tecnico: true   // 👈 ESTO TRAE: nombre del mecánico
+              }
+            }
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(clientes);
