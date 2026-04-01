@@ -304,26 +304,40 @@ export default function MovimientosEntrada() {
   const esGlobal = user?.rol === 'Admin' || user?.rol === 'Gerente'
 
   const cargarDatos = async () => {
+    // 1. 🛡️ GUARDIA: Si no es global y el usuario aún no carga, no hagas nada.
+    // Esto evita enviar tallerId=undefined
+    if (!esGlobal && !user?.tallerId) return;
+
     setLoading(true)
     try {
-      const url = esGlobal ? '/ingresos' : `/ingresos?tallerId=${user?.tallerId}`
+      // 2. Construcción limpia de la URL
+      const url = esGlobal ? '/ingresos' : `/ingresos?tallerId=${user.tallerId}`
+      
       const [rI, rT, rM, rP] = await Promise.all([
         api.get(url).catch(() => ({ data: [] })),
         api.get('/talleres').catch(() => ({ data: [] })),
         api.get('/costos-maestros').catch(() => ({ data: [] })),
         api.get('/proveedores').catch(() => ({ data: [] })),
       ])
+
       setMovimientos(rI.data)
       setTalleres(rT.data)
       setMaestros(rM.data)
       setProveedores(rP.data)
+
       if (!esGlobal && user?.tallerId) setTabActiva(user.tallerId)
+    } catch (error) {
+      console.error("Error en la carga:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { cargarDatos() }, [user])
+  useEffect(() => { 
+    if (user) {
+      cargarDatos() 
+    }
+  }, [user, esGlobal])
 
   // Reset página al cambiar filtros
   useEffect(() => { setPage(1) }, [search, tabActiva])
@@ -409,121 +423,121 @@ export default function MovimientosEntrada() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-  {filtered.map(m => {
-    const isRechazado = m.estado?.toUpperCase() === 'RECHAZADO'
-    const tipoKey = m.tipo?.toUpperCase()
-    
-    // 🎨 Regresamos a tus colores: Esmeralda, Ámbar y Morado
-    const config = {
-      'CON_RUC':       { color: '#059669', label: 'CON RUC' },     // Verde Esmeralda
-      'SIN_RUC':       { color: '#d97706', label: 'SIN RUC' },     // Ámbar
-      'INTERNO':       { color: '#7c3aed', label: 'INTERNO' },     // Morado
-      'TRANSFERENCIA': { color: '#d97706', label: 'SIN RUC (Ant)' } // Ámbar (Sist. anterior)
-    }[tipoKey] || { color: '#64748b', label: m.tipo }
+              {filtered.map(m => {
+                const isRechazado = m.estado?.toUpperCase() === 'RECHAZADO'
+                const tipoKey = m.tipo?.toUpperCase()
+                
+                // 🎨 Regresamos a tus colores: Esmeralda, Ámbar y Morado
+                const config = {
+                  'CON_RUC':       { color: '#059669', label: 'CON RUC' },     // Verde Esmeralda
+                  'SIN_RUC':       { color: '#d97706', label: 'SIN RUC' },     // Ámbar
+                  'INTERNO':       { color: '#7c3aed', label: 'INTERNO' },     // Morado
+                  'TRANSFERENCIA': { color: '#d97706', label: 'SIN RUC (Ant)' } // Ámbar (Sist. anterior)
+                }[tipoKey] || { color: '#64748b', label: m.tipo }
 
-    const motivoColor = isRechazado ? '#94a3b8' : config.color
-    const esTraslado  = tipoKey === 'INTERNO' || tipoKey === 'TRANSFERENCIA'
+                const motivoColor = isRechazado ? '#94a3b8' : config.color
+                const esTraslado  = tipoKey === 'INTERNO' || tipoKey === 'TRANSFERENCIA'
 
-    return (
-      <tr key={m.id}
-        className="transition-colors hover:brightness-[0.98]"
-        // style={{
-        //   background: isRechazado ? '#f8fafc' 
-        //     : esTraslado 
-        //       ? m.cantidad < 0 ? 'rgba(254,242,242,0.4)' : 'rgba(245,243,255,0.4)' 
-        //       : 'transparent',
-        //   borderLeft: isRechazado ? '4px solid #e2e8f0' 
-        //     : esTraslado 
-        //       ? m.cantidad < 0 ? '4px solid #fecaca' : '4px solid #ddd6fe' 
-        //       : `4px solid ${config.color}40`, // Borde suave del color de la categoría
-        // }}
-        >
+                return (
+                  <tr key={m.id}
+                    className="transition-colors hover:brightness-[0.98]"
+                    // style={{
+                    //   background: isRechazado ? '#f8fafc' 
+                    //     : esTraslado 
+                    //       ? m.cantidad < 0 ? 'rgba(254,242,242,0.4)' : 'rgba(245,243,255,0.4)' 
+                    //       : 'transparent',
+                    //   borderLeft: isRechazado ? '4px solid #e2e8f0' 
+                    //     : esTraslado 
+                    //       ? m.cantidad < 0 ? '4px solid #fecaca' : '4px solid #ddd6fe' 
+                    //       : `4px solid ${config.color}40`, // Borde suave del color de la categoría
+                    // }}
+                    >
 
-        {/* FECHA / SEDE */}
-        <td className="px-6 py-4">
-          <p className="text-xs font-black text-slate-800" style={{ opacity: isRechazado ? 0.5 : 1 }}>
-            {new Date(m.createdAt).toLocaleDateString()}
-          </p>
-          <p className="text-[9px] font-bold uppercase mt-0.5" 
-             style={{ color: motivoColor, opacity: isRechazado ? 0.6 : 1 }}>
-            📍 {m.taller?.nombre}
-          </p>
-        </td>
+                    {/* FECHA / SEDE */}
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-black text-slate-800" style={{ opacity: isRechazado ? 0.5 : 1 }}>
+                        {new Date(m.createdAt).toLocaleDateString()}
+                      </p>
+                      <p className="text-[9px] font-bold uppercase mt-0.5" 
+                        style={{ color: motivoColor, opacity: isRechazado ? 0.6 : 1 }}>
+                        📍 {m.taller?.nombre}
+                      </p>
+                    </td>
 
-        {/* PRODUCTO (Ahora con color de categoría) */}
-        <td className="px-6 py-4">
-          <p className="text-xs font-black uppercase"
-            style={{ 
-              color: isRechazado ? '#94a3b8' : motivoColor, // 🚀 Aplicado el color aquí
-              textDecoration: isRechazado ? 'line-through' : 'none' 
-            }}>
-            {m.costoMaestro?.nombre}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[9px] font-bold uppercase text-slate-400">{m.costoMaestro?.marca}</p>
-            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
-              {m.costoMaestro?.medida || 'Und'}
-            </span>
-          </div>
-        </td>
+                    {/* PRODUCTO (Ahora con color de categoría) */}
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-black uppercase"
+                        style={{ 
+                          color: isRechazado ? '#94a3b8' : motivoColor, // 🚀 Aplicado el color aquí
+                          textDecoration: isRechazado ? 'line-through' : 'none' 
+                        }}>
+                        {m.costoMaestro?.nombre}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-[9px] font-bold uppercase text-slate-400">{m.costoMaestro?.marca}</p>
+                        <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
+                          {m.costoMaestro?.medida || 'Und'}
+                        </span>
+                      </div>
+                    </td>
 
-        {/* MOTIVO / REFERENCIA */}
-        <td className="px-6 py-4" style={{ opacity: isRechazado ? 0.5 : 1 }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider"
-              style={{ background: `${motivoColor}15`, color: motivoColor, border: `1px solid ${motivoColor}30` }}>
-              {config.label}
-            </span>
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-tight" style={{ color: motivoColor }}>{m.motivo}</p>
-          <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
-            {m.cantidad < 0
-              ? `Hacia: ${m.tallerOrigen?.nombre || 'Destino'}`
-              : m.proveedor
-                ? `🏢 ${m.proveedor.razonSocial}`
-                : m.tallerOrigen
-                  ? `🔄 Origen: ${m.tallerOrigen.nombre}`
-                  : `📝 Referencia Interna`
-            }
-          </p>
-        </td>
+                    {/* MOTIVO / REFERENCIA */}
+                    <td className="px-6 py-4" style={{ opacity: isRechazado ? 0.5 : 1 }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider"
+                          style={{ background: `${motivoColor}15`, color: motivoColor, border: `1px solid ${motivoColor}30` }}>
+                          {config.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-tight" style={{ color: motivoColor }}>{m.motivo}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
+                        {m.cantidad < 0
+                          ? `Hacia: ${m.tallerOrigen?.nombre || 'Destino'}`
+                          : m.proveedor
+                            ? `🏢 ${m.proveedor.razonSocial}`
+                            : m.tallerOrigen
+                              ? `🔄 Origen: ${m.tallerOrigen.nombre}`
+                              : `📝 Referencia Interna`
+                        }
+                      </p>
+                    </td>
 
-        {/* CANTIDAD */}
-        <td className="px-6 py-4 text-center">
-          <span className="px-3 py-1 rounded-full font-black text-xs"
-            style={{
-              // Lógica de fondos: Gris si rechazado, Rojo si negativo, Azul si positivo
-              background: isRechazado ? '#f1f5f9' : m.cantidad < 0 ? '#fef2f2' : '#eff6ff',
-              // Lógica de textos: Gris si rechazado, Rojo si negativo, Azul si positivo
-              color:      isRechazado ? '#94a3b8' : m.cantidad < 0 ? '#dc2626' : '#2563eb',
-              textDecoration: isRechazado ? 'line-through' : 'none',
-            }}>
-            {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
-          </span>
-        </td>
+                    {/* CANTIDAD */}
+                    <td className="px-6 py-4 text-center">
+                      <span className="px-3 py-1 rounded-full font-black text-xs"
+                        style={{
+                          // Lógica de fondos: Gris si rechazado, Rojo si negativo, Azul si positivo
+                          background: isRechazado ? '#f1f5f9' : m.cantidad < 0 ? '#fef2f2' : '#eff6ff',
+                          // Lógica de textos: Gris si rechazado, Rojo si negativo, Azul si positivo
+                          color:      isRechazado ? '#94a3b8' : m.cantidad < 0 ? '#dc2626' : '#2563eb',
+                          textDecoration: isRechazado ? 'line-through' : 'none',
+                        }}>
+                        {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                      </span>
+                    </td>
 
-        {/* ESTADO */}
-        <td className="px-6 py-4 text-center">
-          <EstadoBadge estado={m.estado} />
-        </td>
+                    {/* ESTADO */}
+                    <td className="px-6 py-4 text-center">
+                      <EstadoBadge estado={m.estado} />
+                    </td>
 
-        {/* ACCIÓN */}
-        <td className="px-6 py-4 text-center">
-          {m.estado?.toUpperCase() === 'EN CAMINO' ? (
-            <button onClick={() => manejarRecepcion(m.id)}
-              className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all shadow-md">
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="4" viewBox="0 0 24 24">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </button>
-          ) : (
-            <span className="text-[9px] font-bold text-slate-300 italic">Sin acciones</span>
-          )}
-        </td>
-      </tr>
-    )
-  })}
-</tbody>
+                    {/* ACCIÓN */}
+                    <td className="px-6 py-4 text-center">
+                      {m.estado?.toUpperCase() === 'EN CAMINO' ? (
+                        <button onClick={() => manejarRecepcion(m.id)}
+                          className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all shadow-md">
+                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="4" viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        </button>
+                      ) : (
+                        <span className="text-[9px] font-bold text-slate-300 italic">Sin acciones</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
           </table>
 
           {rows.length === 0 && (

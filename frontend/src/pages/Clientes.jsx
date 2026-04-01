@@ -110,23 +110,32 @@ export default function Clientes() {
   
   const [tipoAtencion, setTipoAtencion] = useState('MANTENIMIENTO')
   const [formCita, setFormCita] = useState({ servicioId: '', tecnicoId: '', fecha: new Date().toISOString().split('T')[0], hora: '' })
+  const [talleresDB, setTalleresDB] = useState([]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [resC, resS, resU, resCitas] = await Promise.all([
+      // 1. Aquí definimos las 5 variables (resC, resS, resU, resCitas, resT)
+      const [resC, resS, resU, resCitas, resT] = await Promise.all([
         axios.get(`${API_URL}/clientes`),
         axios.get(`${API_URL}/servicios`),
         axios.get(`${API_URL}/usuarios`),
-        axios.get(`${API_URL}/citas`) 
+        axios.get(`${API_URL}/citas`),
+        axios.get(`${API_URL}/talleres`) // 👈 2. Asegúrate de que este llamado esté aquí
       ]);
+
+      // 3. Ahora sí podemos usarlas todas
       setClientes(resC.data);
       setServiciosDB(resS.data);
       setUsuariosDB(resU.data);
       setCitasDB(resCitas.data);
-    } catch (err) { console.error("Error sincronizando data:", err); }
-    finally { setLoading(false); }
-  }
+      setTalleresDB(resT.data); // 👈 4. Esto ya no dará error
+    } catch (err) {
+      console.error("Error sincronizando data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { if (user) fetchData() }, [user])
 
@@ -139,12 +148,24 @@ export default function Clientes() {
   }, [tipoAtencion, modalCita, serviciosDB]);
 
   const mecanicosFiltrados = useMemo(() => {
+    // 1. Determinamos el ID del taller a filtrar:
+    // Si el usuario logueado ya tiene tallerId (Call Center), usamos ese.
+    // Si es null (Admin), usamos el que se seleccionó en el formulario.
+    const tallerIdFiltro = user?.tallerId || Number(formCita.tallerId);
+
     return usuariosDB.filter(u => {
       const esMecanico = String(u.rol).toUpperCase().includes('MECÁNICO');
-      if (!user?.tallerId) return esMecanico;
-      return esMecanico && u.tallerId === user.tallerId;
+
+      // 2. Si logramos identificar un taller para filtrar:
+      if (tallerIdFiltro) {
+        return esMecanico && u.tallerId === tallerIdFiltro;
+      }
+
+      // 3. Si no hay tallerId (caso Admin que aún no selecciona nada en el modal):
+      // Devolvemos false para que la lista esté vacía y no asigne a alguien por error.
+      return false; 
     });
-  }, [usuariosDB, user]);
+  }, [usuariosDB, formCita.tallerId, user?.tallerId]); // 👈 Importante incluir user?.tallerId aquí
 
   // Lógica de horarios
   const isTimeInRange = (slotTime) => {
@@ -170,6 +191,15 @@ export default function Clientes() {
       }
       return false;
     });
+  };
+
+  const abrirModalCita = (cliente) => {
+    setFormCita({
+      ...formCita,
+      tallerId: user?.tallerId || '', 
+      hora: ''
+    });
+    setModalCita(cliente);
   };
 
   const abrirEdicion = (cliente) => {
@@ -206,19 +236,39 @@ export default function Clientes() {
   }
 
   const handleConfirmarCita = async () => {
+    // 1. Rescatamos el tallerId (del formulario o del usuario logueado)
+    const idTallerFinal = formCita.tallerId || user?.tallerId;
+
+    const payload = {
+      fecha: formCita.fecha,
+      hora_inicio: formCita.hora,
+      vehiculoPlaca: modalCita.vehiculos[0].placa,
+      tecnicoId: parseInt(formCita.tecnicoId),
+      servicioId: parseInt(formCita.servicioId),
+      tallerId: parseInt(idTallerFinal) // 👈 Aquí aseguramos que no sea NaN
+    };
+
+    console.log("🚀 PAYLOAD FINAL:", payload);
+
+    // 2. Validación de seguridad antes de enviar
+    if (isNaN(payload.tecnicoId) || isNaN(payload.servicioId) || isNaN(payload.tallerId)) {
+      alert("⚠️ Faltan datos: Por favor selecciona un Servicio y un Técnico.");
+      console.error("IDs inválidos detectados:", payload);
+      return;
+    }
+
     try {
-      const payload = {
-        fecha: formCita.fecha, hora_inicio: formCita.hora,
-        vehiculoPlaca: modalCita.vehiculos[0].placa,
-        tecnicoId: parseInt(formCita.tecnicoId),
-        servicioId: parseInt(formCita.servicioId)
-      };
+      // 3. Envío al servidor
       await axios.post(`${API_URL}/citas`, payload);
-      alert("Cita reservada con éxito");
+      alert("✅ Cita reservada con éxito");
       setModalCita(null);
-      fetchData();
-    } catch (err) { alert("Error al reservar") }
-  }
+      fetchData(); // Refrescamos la tabla
+    } catch (err) {
+      // Mostramos el error exacto que manda nuestro controlador de Node
+      const mensajeError = err.response?.data?.error || "Error de conexión";
+      alert("❌ Error: " + mensajeError);
+    }
+  };
 
   const handleEliminarCliente = async () => {
     try {
@@ -323,11 +373,30 @@ export default function Clientes() {
 
                         {/* EDITAR CLIENTE (NUEVO) */}
                         <button 
-                          onClick={() => abrirEdicion(c)} 
-                          title="Editar Datos"
-                          style={{ background: '#eef6ff', border: '1px solid #bcd8f7', padding: '8px', borderRadius: 8, color: '#007bff', cursor: 'pointer' }}
+                          onClick={() => { 
+                            setFormCita({ 
+                              ...formCita, 
+                              hora: '', 
+                              // 🚀 ESTO ES LO QUE FALTA:
+                              // Si Ángela tiene un tallerId, se carga de inmediato. 
+                              // Si es Admin (null), se queda vacío para que elija uno en el modal.
+                              tallerId: user?.tallerId || '', 
+                              tecnicoId: '', 
+                              servicioId: '' 
+                            }); 
+                            setModalCita(c); 
+                          }} 
+                          title="Agendar Cita"
+                          style={{ 
+                            background: '#f8fafc', 
+                            border: '1px solid #e2e8f0', 
+                            padding: '8px', 
+                            borderRadius: 8, 
+                            color: '#64748b', 
+                            cursor: 'pointer' 
+                          }}
                         >
-                          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
 
                         {/* ELIMINAR */}
@@ -413,6 +482,27 @@ export default function Clientes() {
                   <option value="">Seleccionar servicio...</option>
                   {serviciosFiltrados.map(s => <option key={s.id} value={s.id}>{s.especialidad} {s.nivel} ({s.duracion}H)</option>)}
                 </select>
+              </Field>
+              {/* SECCIÓN DE TALLER */}
+              <Field label="Sede / Taller">
+                {!user?.tallerId ? (
+                  // VISTA ADMIN: Puede elegir taller
+                  <select 
+                    value={formCita.tallerId} 
+                    onChange={e => setFormCita({...formCita, tallerId: e.target.value, tecnicoId: ''})} // Reset técnico al cambiar taller
+                    style={{ width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${C.border}`, fontWeight: 600, background: '#fff' }}
+                  >
+                    <option value="">Seleccionar taller...</option>
+                    {talleresDB.map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                ) : (
+                  // VISTA STAFF: Solo ve su taller (bloqueado)
+                  <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '10px', fontWeight: 700, color: C.navy, border: `1px solid ${C.border}` }}>
+                    📍 {talleresDB.find(t => t.id === user.tallerId)?.nombre || 'Cargando taller...'}
+                  </div>
+                )}
               </Field>
               <Field label="Asignar Mecánico">
                 <select value={formCita.tecnicoId} onChange={e => setFormCita({...formCita, tecnicoId: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${C.border}`, fontWeight: 600 }}>

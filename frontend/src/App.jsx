@@ -12,10 +12,13 @@ import Clientes from './pages/Clientes'
 import Ingresos from './pages/Ingresos'
 import Pedidos from './pages/Pedidos'
 import Servicios from './pages/Servicios'
+import Citas from './pages/Citas'
+// 1. Importamos la nueva página de recepción
+import RecepcionVehiculo from './pages/RecepcionVehiculo'
+import GestionTaller from './pages/GestionTaller'
 
 function App() {
   return (
-    // EL PROVIDER DEBE ENVOLVER TODO
     <AuthProvider> 
       <Toaster 
         position="top-right"
@@ -42,6 +45,11 @@ function App() {
           <Route path="/ingresos" element={<Ingresos />} />
           <Route path="/pedidos" element={<Pedidos />} />
           <Route path="/servicios" element={<Servicios />} />
+          <Route path="/citas" element={<Citas />} />
+
+          {/* 2. Acoplamos la ruta para la Recepción de Vehículos */}
+          <Route path="/recepcion" element={<RecepcionVehiculo />} />
+          <Route path="/gestion-taller" element={<GestionTaller />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -5,15 +5,43 @@ import bcrypt from 'bcrypt'; // Sinceramente, para guardar contraseñas seguras
 const prisma = new PrismaClient();
 
 // OBTENER TODOS LOS USUARIOS (Para tu tabla de React)
-export const getUsuarios = async (_req: Request, res: Response) => {
+export const getUsuarios = async (req: Request, res: Response) => {
   try {
+    // 1. Extraemos los filtros opcionales de la URL
+    const { tallerId, rol } = req.query;
+
+    // 2. Construimos el objeto de filtrado (Where)
+    let where: any = {};
+
+    // Si viene un tallerId, lo filtramos (convertimos a número)
+    if (tallerId && tallerId !== 'undefined') {
+      where.tallerId = Number(tallerId);
+    }
+
+    // Si viene un rol (ej: 'Mecánico'), lo filtramos
+    if (rol) {
+      where.rol = String(rol);
+    }
+
+    // 3. Ejecutamos la consulta con el filtro dinámico
     const usuarios = await prisma.usuario.findMany({
-      include: { 
-        taller: true 
+      where: where, // 👈 Aquí está la clave
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        rol: true,
+        estado: true,
+        tallerId: true,
+        taller: {
+          select: { nombre: true }
+        }
       }
     });
+
     res.json(usuarios);
   } catch (error) {
+    console.error("Error en getUsuarios:", error);
     res.status(500).json({ error: "Error al obtener usuarios" });
   }
 };
@@ -62,23 +90,37 @@ export const createUsuario = async (req: Request, res: Response) => {
 // Actualizar usuario
 export const updateUsuario = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { nombre, email, rol, estado, tallerId } = req.body;
+  const { nombre, email, rol, estado, tallerId, password } = req.body;
 
   try {
+    // 💡 Preparamos los datos a actualizar
+    const dataActualizar: any = {
+      nombre,
+      email,
+      rol,
+      estado,
+      // Manejo robusto del tallerId: Si es vacío, 0 o undefined, mandamos null
+      tallerId: (tallerId && Number(tallerId) !== 0) ? Number(tallerId) : null
+    };
+
+    // 🔒 Si el usuario envió una contraseña nueva, la encriptamos y agregamos
+    if (password && password.trim() !== "") {
+      dataActualizar.password = await bcrypt.hash(password, 10);
+    }
+
     const usuarioActualizado = await prisma.usuario.update({
       where: { id: Number(id) },
-      data: {
-        nombre,
-        email,
-        rol,
-        estado,
-        // 🛠️ IMPORTANTE: Convertimos a Int o null para que Prisma no se queje
-        tallerId: tallerId ? Number(tallerId) : null 
+      data: dataActualizar,
+      // Incluimos el taller en la respuesta para que React actualice la tabla al instante
+      include: {
+        taller: { select: { nombre: true } }
       }
     });
+
     res.json(usuarioActualizado);
   } catch (error) {
-    res.status(500).json({ error: "No se pudo actualizar el usuario" });
+    console.error("Error en Update:", error);
+    res.status(500).json({ error: "No se pudo actualizar el usuario. Revisa si el email ya existe." });
   }
 };
 
