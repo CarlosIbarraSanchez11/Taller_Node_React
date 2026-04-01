@@ -287,6 +287,54 @@ export default function Clientes() {
     )
   }, [clientes, search])
 
+  const hoy = new Date().toISOString().split('T')[0];
+
+  const isPastTime = (slotTime) => {
+    const ahora = new Date();
+    const hoyStr = ahora.toISOString().split('T')[0];
+    
+    // Si la fecha elegida no es hoy, no bloqueamos por hora
+    if (formCita.fecha !== hoyStr) return false;
+
+    // Si es hoy, comparamos las horas
+    const horaActual = ahora.getHours();
+    const horaSlot = parseInt(slotTime.split(':')[0]);
+
+    // Bloqueamos si la hora del slot es menor o igual a la hora actual
+    return horaSlot <= horaActual;
+  };
+
+  const renderEstadoCita = (cliente) => {
+    const citaActiva = cliente.vehiculos.some(v => 
+      v.citas.some(c => c.estado === 'PENDIENTE' || c.estado === 'EN PROCESO')
+    );
+
+    if (citaActiva) {
+      return (
+        <div className="flex flex-col items-start">
+          <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black uppercase flex items-center gap-1 border border-emerald-100">
+            <span className="animate-pulse">🗓️</span> CITA ACTIVA
+          </span>
+          <span className="text-[10px] text-gray-400 mt-1 italic">
+              {cliente.correo}
+          </span>
+        </div>
+      );
+    }
+
+    // Si no hay ninguna pendiente o en proceso, está "SIN CITA"
+    return (
+      <div className="flex flex-col items-start opacity-50">
+        <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded-md text-[10px] font-black uppercase flex items-center gap-1 border border-gray-200">
+          ⚪ SIN CITA
+        </span>
+        <span className="text-[10px] text-gray-300 mt-1">
+            {cliente.correo}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <Layout tituloNavbar="Directorio de Clientes · Dr. Motors">
       <style>{`
@@ -325,7 +373,14 @@ export default function Clientes() {
             <tbody>
               {filtered.map(c => {
                 const v = c.vehiculos?.[0] || {};
-                const citaActiva = v.citas?.find(cita => cita.estado === 'PENDIENTE');
+
+                // 1. CAMBIO CLAVE: Buscamos la cita específica para tener el objeto completo
+                const citaActiva = c.vehiculos?.flatMap(veh => veh.citas || [])
+                  .find(cita => cita.estado === 'PENDIENTE' || cita.estado === 'EN PROCESO');
+
+                // 2. Definimos el booleano para el bloqueo del botón
+                const tieneCitaActiva = Boolean(citaActiva);
+
                 return (
                   <tr key={c.id} className="row-hover">
                     <td className="cell">
@@ -339,8 +394,10 @@ export default function Clientes() {
                         </div>
                       </div>
                     </td>
+
                     <td className="cell" style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{c.numDocumento}</td>
                     <td className="cell" style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{c.telefono}</td>
+                    
                     <td className="cell">
                       {v.placa ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -350,53 +407,58 @@ export default function Clientes() {
                         </div>
                       ) : '---'}
                     </td>
+
                     <td className="cell">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        {citaActiva ? (
-                          <button onClick={() => setModalVerCita({ cliente: c, cita: citaActiva })} style={{ border: 'none', background: '#ecfdf5', color: '#15803d', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer', width: 'fit-content' }}>📅 CITA ACTIVA</button>
+                        {/* ✅ Ahora citaActiva ya está definida */}
+                        {tieneCitaActiva ? (
+                          <button 
+                            onClick={() => setModalVerCita({ cliente: c, cita: citaActiva })} 
+                            style={{ border: 'none', background: '#ecfdf5', color: '#15803d', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer', width: 'fit-content' }}
+                          >
+                            📅 CITA ACTIVA
+                          </button>
                         ) : (
-                          <span style={{ color: C.muted, background: '#f1f5f9', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, width: 'fit-content' }}>🔘 SIN CITA</span>
+                          <span style={{ color: C.muted, background: '#f1f5f9', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, width: 'fit-content' }}>
+                            🔘 SIN CITA
+                          </span>
                         )}
                         <div style={{ fontSize: 11, color: C.subtle }}>{c.email || 'sin-correo@mail.com'}</div>
                       </div>
                     </td>
+
                     <td className="cell" style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                        {/* AGENDAR CITA */}
-                        <button 
-                          onClick={() => { setFormCita({ ...formCita, hora: '' }); setModalCita(c); }} 
-                          title="Agendar Cita"
-                          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: 8, color: '#64748b', cursor: 'pointer' }}
-                        >
-                          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        </button>
-
-                        {/* EDITAR CLIENTE (NUEVO) */}
+                        {/* BOTÓN AGENDAR / BLOQUEADO */}
                         <button 
                           onClick={() => { 
-                            setFormCita({ 
-                              ...formCita, 
-                              hora: '', 
-                              // 🚀 ESTO ES LO QUE FALTA:
-                              // Si Ángela tiene un tallerId, se carga de inmediato. 
-                              // Si es Admin (null), se queda vacío para que elija uno en el modal.
-                              tallerId: user?.tallerId || '', 
-                              tecnicoId: '', 
-                              servicioId: '' 
-                            }); 
+                            setFormCita({ ...formCita, hora: '', tallerId: user?.tallerId || '', tecnicoId: '', servicioId: '' }); 
                             setModalCita(c); 
                           }} 
-                          title="Agendar Cita"
+                          disabled={tieneCitaActiva} 
+                          title={tieneCitaActiva ? "Cliente con cita en curso" : "Agendar Cita"}
                           style={{ 
                             background: '#f8fafc', 
                             border: '1px solid #e2e8f0', 
                             padding: '8px', 
                             borderRadius: 8, 
                             color: '#64748b', 
-                            cursor: 'pointer' 
+                            cursor: tieneCitaActiva ? 'not-allowed' : 'pointer',
+                            opacity: tieneCitaActiva ? 0.4 : 1,
+                            filter: tieneCitaActiva ? 'grayscale(1)' : 'none'
                           }}
                         >
-                                                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                          </svg>
+                        </button>
+
+                        {/* EDITAR (Opcional, puedes poner el ícono de lápiz aquí) */}
+                        <button 
+                          onClick={() => abrirEdicion(c)}
+                          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: 8, color: '#64748b', cursor: 'pointer' }}
+                        >
+                          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         </button>
 
                         {/* ELIMINAR */}
@@ -410,7 +472,7 @@ export default function Clientes() {
                       </div>
                     </td>
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>
@@ -516,14 +578,42 @@ export default function Clientes() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                 {['08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00'].map(h => {
                   const ocupado = isTechnicianBusy(h);
+                  const esPasado = isPastTime(h); // 🚀 Nueva validación
                   const seleccionado = isTimeInRange(h);
+
                   return (
-                    <button key={h} type="button" disabled={ocupado} onClick={() => setFormCita({...formCita, hora: h})} style={{ padding: '14px 5px', borderRadius: '10px', fontWeight: '800', fontSize: '13px', cursor: ocupado ? 'not-allowed' : 'pointer', border: `2px solid ${seleccionado ? C.blue : ocupado ? '#fee2e2' : '#f1f5f9'}`, background: seleccionado ? C.blue : ocupado ? '#fef2f2' : '#fff', color: seleccionado ? '#fff' : ocupado ? '#ef4444' : C.navy, opacity: ocupado ? 0.6 : 1 }}>{ocupado ? 'OCUPADO' : h}</button>
+                    <button 
+                      key={h} 
+                      type="button" 
+                      // Deshabilitamos si está ocupado O si la hora ya pasó
+                      disabled={ocupado || esPasado} 
+                      onClick={() => setFormCita({...formCita, hora: h})} 
+                      style={{ 
+                        padding: '14px 5px', 
+                        borderRadius: '10px', 
+                        fontWeight: '800', 
+                        fontSize: '13px', 
+                        // Cambiamos el cursor y estilo si es una hora pasada
+                        cursor: (ocupado || esPasado) ? 'not-allowed' : 'pointer', 
+                        border: `2px solid ${seleccionado ? C.blue : (ocupado || esPasado) ? '#fee2e2' : '#f1f5f9'}`, 
+                        background: seleccionado ? C.blue : (ocupado || esPasado) ? '#fef2f2' : '#fff', 
+                        color: seleccionado ? '#fff' : (ocupado || esPasado) ? '#ef4444' : C.navy, 
+                        opacity: (ocupado || esPasado) ? 0.6 : 1 
+                      }}
+                    >
+                      {ocupado ? 'OCUPADO' : esPasado ? 'PASADO' : h}
+                    </button>
                   );
                 })}
               </div>
               <Field label="Fecha Programada">
-                <input type="date" value={formCita.fecha} onChange={e => setFormCita({...formCita, fecha: e.target.value, hora: ''})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${C.border}`, fontWeight: '700' }} />
+                <input 
+                  type="date" 
+                  min={hoy} // 🚀 Esto bloquea cualquier día anterior a hoy
+                  value={formCita.fecha} 
+                  onChange={e => setFormCita({...formCita, fecha: e.target.value, hora: ''})} 
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${C.border}`, fontWeight: '700' }} 
+                />
               </Field>
               <button onClick={handleConfirmarCita} disabled={!formCita.hora || !formCita.servicioId || !formCita.tecnicoId} style={{ width: '100%', padding: '16px', background: C.blue, color: 'white', border: 'none', borderRadius: '15px', fontSize: '14px', fontWeight: '900', cursor: 'pointer', opacity: (!formCita.hora || !formCita.servicioId) ? 0.5 : 1 }}>CONFIRMAR RESERVA</button>
             </div>

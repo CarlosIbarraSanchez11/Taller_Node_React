@@ -77,10 +77,17 @@ export const getClientes = async (req: Request, res: Response) => {
         vehiculos: {
           include: {
             citas: {
-              where: { estado: 'PENDIENTE' },
+              where: {
+                estado: { not: 'ARCHIVADO' } 
+              },
+              // 👇 Agregamos esto para que la cita más nueva sea la primera en el array
+              orderBy: {
+                fecha: 'desc' 
+              },
+              // take: 1, // 👈 Opcional: Si solo quieres la última absoluta
               include: {
-                servicio: true, // 👈 ESTO TRAE: especialidad, nivel, etc.
-                tecnico: true   // 👈 ESTO TRAE: nombre del mecánico
+                servicio: true,
+                tecnico: true  
               }
             }
           }
@@ -90,6 +97,7 @@ export const getClientes = async (req: Request, res: Response) => {
     });
     res.json(clientes);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Error al obtener clientes." });
   }
 };
