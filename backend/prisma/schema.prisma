@@ -81,8 +81,7 @@ model CostoMaestro {
 
   productos Producto[]
   ingresos  IngresoStock[]
-
-  // 🚀 RELACIÓN PARA PEDIDOS (Agregado)
+  hallazgos Hallazgo[]
   pedidos Pedido[]
 
   @@unique([nombre, marca, medida])
@@ -207,41 +206,72 @@ model Cita {
 }
 
 model OrdenTrabajo {
-  id String @id @default(cuid())
+  id                String   @id @default(cuid())
 
   // 🔗 Relación 1:1 con Cita
-  citaId String @unique
-  cita   Cita   @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  citaId            String   @unique
+  cita              Cita     @relation(fields: [citaId], references: [id], onDelete: Cascade)
 
-  // 👤 Mecánico que realmente realizó la recepción
-  mecanicoId Int
-  mecanico   Usuario @relation(fields: [mecanicoId], references: [id])
+  // 👤 Mecánico que realizó la recepción/trabajo
+  mecanicoId        Int
+  mecanico          Usuario  @relation(fields: [mecanicoId], references: [id])
 
-  // 📊 Datos Técnicos de Ingreso
-  kilometraje         Int
-  nivelCombustible    String // E, 1/4, 1/2, 3/4, F
-  gradoAceite         String?
+  // 📈 Gestión de Progreso (NUEVO)
+  progreso          Int      @default(0) // 0 a 100%
+  estado            String   @default("RECIBIDO") // RECIBIDO, INSPECCION, PRESUPUESTO, EJECUCION, FINALIZADO
+
+  // 📝 Datos Técnicos de Ingreso
+  kilometraje       Int
+  nivelCombustible  String   
+  gradoAceite       String?
   marcaAceiteSugerida String?
+  inventario        Json    
+  observaciones     String?  @db.Text
+  fotos             Json?    
 
-  // 📋 Inventario en formato JSON 
-  // Ej: { "gata": true, "soat": false, "llave": true }
-  inventario Json
+  inspeccionTecnica Json?
 
-  // 📝 Notas y Daños
-  observaciones String? @db.Text
+  // 🛠️ Relaciones de Operación (NUEVO)
+  hallazgos         Hallazgo[]
+  items             ItemOrden[]
 
-  // 📸 Fotos (Rutas de archivos o URLs)
-  // Ej: { "frontal": "img1.jpg", "posterior": "img2.jpg" }
-  fotos Json?
-
-  // 🚦 Estado del trabajo en el taller
-  estado String @default("RECIBIDO") // RECIBIDO, EN_PROCESO, FINALIZADO
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([citaId])
   @@index([mecanicoId])
+}
+
+model Hallazgo {
+  id          String       @id @default(cuid())
+  ordenId     String
+  orden       OrdenTrabajo @relation(fields: [ordenId], references: [id])
+  
+  costoMaestroId Int?
+  costoMaestro   CostoMaestro? @relation(fields: [costoMaestroId], references: [id])
+
+  puntoFalla  String       // Eje: "Fuga en amortiguador" o el nombre del producto
+  descripcion String?      @db.Text
+  
+  cantidad    Int          @default(1)
+  precioVenta Float        @default(0) // Snapshot del precio en ese momento
+  total       Float        @default(0) // $Total = Cantidad \times precioVenta$
+  
+  foto        String?
+  estado      String       @default("POR ENVIAR") // POR ENVIAR, PENDIENTE, APROBADO, RECHAZADO
+  
+  createdAt   DateTime     @default(now())
+}
+
+model ItemOrden {
+  id             String       @id @default(cuid())
+  ordenId        String
+  orden          OrdenTrabajo @relation(fields: [ordenId], references: [id])
+  nombre         String
+  cantidad       Int          @default(1)
+  precioVenta    Decimal      @db.Decimal(10, 2)
+  esAdicional    Boolean      @default(false) // true si viene de un hallazgo
+  estado         String       @default("SOLICITADO") 
 }
 
 model Proveedor {

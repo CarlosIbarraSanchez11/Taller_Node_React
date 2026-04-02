@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 
 const prisma = new PrismaClient();
 
@@ -10,18 +13,45 @@ export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
       mecanicoId, 
       kilometraje, 
       nivelCombustible, 
-      inventario, // Esto llega como String desde FormData
+      inventario, 
       observaciones,
       gradoAceite,
       marcaAceiteSugerida
     } = req.body;
 
-    // 📸 Extraemos los nombres de los archivos que Multer guardó
+    // 📸 Procesamiento de Imágenes con Sharp
     const files = req.files as Express.Multer.File[];
-    const nombresFotos = files ? files.map(f => f.filename) : [];
+    const nombresFotos: string[] = [];
+    const directory = 'uploads/ordenes/';
 
+    // 📁 Aseguramos que la carpeta exista
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true });
+    }
+
+    if (files && files.length > 0) {
+      // Usamos Promise.all para procesar todas las fotos en paralelo (más rápido)
+      await Promise.all(
+        files.map(async (file) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const nombreArchivo = `FOTO-${uniqueSuffix}.jpg`;
+          const rutaFinal = path.join(directory, nombreArchivo);
+
+          await sharp(file.buffer)
+            .rotate() 
+            .resize(1200, null, { withoutEnlargement: true })
+            .toFormat('jpeg')
+            .jpeg({ quality: 70, progressive: true }) 
+            .toFile(rutaFinal);
+
+          nombresFotos.push(nombreArchivo);
+        })
+      );
+    }
+
+    // ⛓️ Transacción de Base de Datos
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Creamos la Orden de Trabajo
+      // 1. Creamos la Orden de Trabajo con los nombres de archivos comprimidos
       const nuevaOrden = await tx.ordenTrabajo.create({
         data: {
           citaId,
@@ -30,10 +60,9 @@ export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
           nivelCombustible,
           gradoAceite,
           marcaAceiteSugerida,
-          // ⚠️ IMPORTANTE: Parseamos el inventario porque FormData lo envía como string
           inventario: typeof inventario === 'string' ? JSON.parse(inventario) : inventario,
           observaciones,
-          fotos: nombresFotos, // Guardamos el array de nombres de archivos ["FOTO-1.jpg", ...]
+          fotos: nombresFotos, // ["FOTO-123.jpg", "FOTO-456.jpg"]
           estado: 'RECIBIDO'
         }
       });
@@ -51,7 +80,7 @@ export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({
-      message: "Orden de trabajo abierta correctamente",
+      message: "Orden de trabajo abierta y fotos optimizadas",
       orden: resultado
     });
 
