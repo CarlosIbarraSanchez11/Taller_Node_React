@@ -96,6 +96,7 @@ function ModalProducto({ item, matriz, costosExistentes, onClose, onSave }) {
             <option value="">Seleccionar...</option>
             <option value="ACEITES">ACEITES</option>
             <option value="FILTROS">FILTROS</option>
+            <option value="MOTOR">MOTOR</option>
             <option value="FRENOS">FRENOS</option>
             <option value="SUSPENSIÓN">SUSPENSIÓN</option>
             <option value="BATERÍAS">BATERÍAS</option>

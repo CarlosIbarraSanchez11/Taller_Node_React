@@ -1,11 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getGestionOrden, updateInspeccionTecnica, buscarProductosMaestro } from '../controllers/gestionController';
+import { getGestionOrden, updateInspeccionTecnica, buscarProductosMaestro, crearHallazgoIndependiente, enviarPresupuestoWhatsApp, getHallazgosPublicos, responderHallazgo, subirEvidenciaInstalacion,eliminarEvidenciaInstalacion} from '../controllers/gestionController';
 
 const router = Router();
 
-// 1. Configuramos el almacenamiento en memoria (RAM)
-// Esto es vital para que Sharp pueda procesar las fotos antes de guardarlas en el disco
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage,
@@ -15,12 +13,14 @@ const upload = multer({
     } 
 });
 
-// 2. Ruta para obtener la información inicial
-router.get('/:citaId', getGestionOrden);
-
-// 3. 🚀 RUTA CLAVE: Agregamos 'upload.any()'
-// Usamos .any() porque los nombres de las fotos son dinámicos (ej: foto_frenos_1, foto_motor_5)
 router.put('/actualizar/:ordenId', upload.any(), updateInspeccionTecnica);
-router.get('/productos/buscar', buscarProductosMaestro);
+router.post('/hallazgo/:ordenId', upload.single('foto_hallazgo'), crearHallazgoIndependiente);
+router.get('/buscar-maestro', buscarProductosMaestro);
+router.get('/:citaId', getGestionOrden);
+router.post('/enviar-presupuesto/:ordenId', enviarPresupuestoWhatsApp);
+router.get('/publico/hallazgos/:ordenId', getHallazgosPublicos);
+router.put('/publico/responder-hallazgo/:id', responderHallazgo);
+router.patch('/hallazgos/:id/evidencia', upload.single('foto'), subirEvidenciaInstalacion);
+router.patch('/hallazgos/:id/evidencia-eliminar', eliminarEvidenciaInstalacion);
 
 export default router;

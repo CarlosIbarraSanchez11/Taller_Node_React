@@ -4,10 +4,13 @@ import {
   getProductoById,
   createProducto, 
   updateProducto, 
-  deleteProducto 
+  deleteProducto,
+  buscarParaEntregaKit
 } from '../controllers/productoController';
 
 const router = Router();
+
+router.get('/buscar-kit', buscarParaEntregaKit);
 
 router.get('/', getProductos);
 router.get('/:id', getProductoById);

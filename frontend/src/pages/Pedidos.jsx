@@ -18,6 +18,20 @@ function EstadoPedidoBadge({ estado }) {
   const config = {
     // 🚀 CAMBIO: Ahora dice "SOLICITADO POR TALLER"
     'PENDIENTE':  { bg: '#faf5ff', color: '#6d28d9', dot: '#8b5cf6', border: '#e9d5ff', label: 'SOLICITADO POR TALLER' },
+    'SOLICITADO_POR_CLIENTE': { 
+      bg: '#fff7ed', 
+      color: '#c2410c', 
+      dot: '#f97316', 
+      border: '#ffedd5', 
+      label: '🔥 SOLICITADO POR CLIENTE' 
+    },
+    'SOLICITADO_POR_KIT': { 
+      bg: '#eff6ff', 
+      color: '#2563eb', 
+      dot: '#3b82f6', 
+      border: '#dbeafe', 
+      label: '📦 SOLICITADO POR KIT' 
+    },
     'DESPACHADO': { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe', label: 'EN CAMINO' },
     'ENTREGADO':  { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', border: '#bbf7d0', label: 'ENTREGADO' },
     'RECHAZADO':  { bg: '#fef2f2', color: '#991b1b', dot: '#ef4444', border: '#fecaca', label: 'RECHAZADO' },
@@ -43,6 +57,10 @@ export default function Pedidos() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState({ col: 'createdAt', dir: 'desc' })
   const [loading, setLoading] = useState(true)
+
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [opcionesKit, setOpcionesKit] = useState([]);
+  const [pedidoActual, setPedidoActual] = useState(null);
 
   const userRol = useMemo(() => user?.rol?.toUpperCase() || '', [user])
   const esGlobal = userRol === 'ADMIN' || userRol === 'GERENTE'
@@ -92,8 +110,16 @@ export default function Pedidos() {
       
       // Filtro de Proceso (Pendientes vs Historial)
       const matchEstado = filtroTab === 'PENDIENTES' 
-        ? (p.estado === 'PENDIENTE' || p.estado === 'DESPACHADO') 
-        : (p.estado === 'ENTREGADO' || p.estado === 'RECHAZADO');
+      ? (
+          p.estado === 'PENDIENTE' || 
+          p.estado === 'DESPACHADO' || 
+          p.estado === 'SOLICITADO_POR_CLIENTE' || // 🚀 AGREGA ESTA LÍNEA
+          p.estado === 'SOLICITADO_POR_KIT'
+        ) 
+      : (
+          p.estado === 'ENTREGADO' || 
+          p.estado === 'RECHAZADO'
+        );
 
       // Buscador
       const q = search.toLowerCase();
@@ -139,6 +165,29 @@ export default function Pedidos() {
     }
   };
 
+  const manejarAperturaModalKit = async (pedido) => {
+    setPedidoActual(pedido);
+    try {
+      const res = await api.get(`/productos/buscar-kit`, {
+        params: { 
+          tallerId: pedido.tallerId, 
+          // 🚀 CAMBIO: Usamos el campo correcto que viene del include
+          filtroKit: pedido.hallazgo?.puntoFalla 
+        }
+      });
+      
+      if (res.data.length === 0) {
+        toast.error("No hay stock para " + (pedido.hallazgo?.puntoFalla || "este rubro"));
+        return;
+      }
+
+      setOpcionesKit(res.data);
+      setModalAbierto(true);
+    } catch (error) {
+      toast.error("Error al buscar productos");
+    }
+  };
+
   const handleRechazar = async (id) => {
     const motivo = window.prompt("Indica el motivo del rechazo para informar a la otra sede:");
     if (!motivo) return;
@@ -176,7 +225,7 @@ export default function Pedidos() {
           </div>
         </div>
 
-        {/* 🚀 SELECTOR DE SEDE (Solo visible para ADMIN) */}
+        {/* SELECTOR DE SEDE */}
         {esGlobal ? (
           <div className="flex flex-wrap items-center gap-2 mb-8">
             {tabsTalleres.map((t) => (
@@ -185,7 +234,7 @@ export default function Pedidos() {
                 onClick={() => setTabTallerActiva(t.id)}
                 className={`px-6 py-2.5 text-[11px] font-black rounded-xl uppercase tracking-wider transition-all shadow-sm border ${
                   String(tabTallerActiva) === String(t.id)
-                    ? 'bg-[#1a3a5c] text-white border-[#1a3a5c] shadow-blue-900/20'
+                    ? 'bg-[#1a3a5c] text-white border-[#1a3a5c]'
                     : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -220,7 +269,6 @@ export default function Pedidos() {
 
         {/* TABLA PRINCIPAL */}
         <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
-          {/* Sub-tabs Proceso */}
           <div className="flex gap-1 p-2 bg-slate-50/50 border-b border-slate-100">
             {['PENDIENTES', 'HISTORIAL'].map(tab => (
               <button key={tab} onClick={() => setFiltroTab(tab)} className={`px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${filtroTab === tab ? 'bg-white text-[#1a3a5c] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -247,56 +295,50 @@ export default function Pedidos() {
                       <p className="text-xs font-black text-slate-800">{p.codigo}</p>
                       <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(p.createdAt).toLocaleDateString()}</p>
                     </td>
+
                     <td className="px-4 py-5">
-                      <p className="text-xs font-black text-slate-800 uppercase">{p.costoMaestro?.nombre}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {/* 🔵 Aquí forzamos el color azul y que sea el campo 'solicitante' el que se muestre */}
-                        <p className="text-[10px] font-bold text-blue-500 uppercase">
-                          {p.solicitante}
-                        </p>
-                      </div>
+                      <p className="text-xs font-black text-slate-800 uppercase">
+                        {p.tipo === 'KIT' ? (p.hallazgo?.puntoFalla || 'KIT DE SERVICIO') : p.costoMaestro?.nombre}
+                      </p>
+                      <p className="text-[10px] font-bold text-blue-500 uppercase mt-0.5">{p.solicitante}</p>
                     </td>
+
                     <td className="px-4 py-5 text-center">
                       <span className="px-3 py-1 bg-slate-100 rounded-lg text-xs font-black text-[#1a3a5c]">{p.cantidad}</span>
                     </td>
+
                     <td className="px-4 py-5 text-center">
                       <EstadoPedidoBadge estado={p.estado} />
                     </td>
+
                     <td className="px-4 py-5">
                       <div className="flex justify-center gap-2">
-                        
-                        {/* 🚀 SI ESTÁ SOLICITADO: Jhon ve el botón de Despachar y Rechazar */}
-                        {p.estado === 'PENDIENTE' && (
+                        {/* ACCIONES NORMALES (TRANSFERENCIAS) */}
+                        {p.estado === 'PENDIENTE' && p.tipo !== 'KIT' && (
                           <>
-                            {/* BOTÓN DESPACHAR: Este es el que cambia a "EN CAMINO" */}
-                            <button 
-                              onClick={() => handleCambiarEstado(p.id, 'DESPACHADO')}
-                              className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all shadow-sm"
-                              title="Despachar Repuesto"
-                            >
-                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <polyline points="20 6 9 17 4 12"/>
-                              </svg>
+                            <button onClick={() => handleCambiarEstado(p.id, 'DESPACHADO')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all shadow-sm">
+                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                             </button>
-
-                            {/* BOTÓN RECHAZAR */}
-                            <button 
-                              onClick={() => handleRechazar(p.id)}
-                              className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                              title="Rechazar Pedido"
-                            >
-                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                              </svg>
+                            <button onClick={() => handleRechazar(p.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                           </>
                         )}
 
-                        {/* BOTÓN VER DETALLES (El ojo que ya tienes) */}
+                        {/* ACCIONES DE ENTREGA (CLIENTE O KIT) */}
+                        {(p.estado === 'SOLICITADO_POR_CLIENTE' || p.estado === 'DESPACHADO' || p.estado === 'SOLICITADO_POR_KIT') && (
+                          <button 
+                            onClick={() => p.tipo === 'KIT' ? manejarAperturaModalKit(p) : handleCambiarEstado(p.id, 'ENTREGADO')}
+                            className={`p-2 rounded-lg transition-all shadow-sm border ${p.tipo === 'KIT' ? 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-600 hover:text-white' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white'}`}
+                          >
+                            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                            </svg>
+                          </button>
+                        )}
                         <button className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-200 transition-all">
-                          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                          </svg>
+                          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
                       </div>
                     </td>
@@ -314,6 +356,69 @@ export default function Pedidos() {
           </div>
         </div>
       </div>
+
+      {/* ─── MODAL DE DESPACHO KIT (Solo para Carlos) ─── */}
+      {modalAbierto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-slate-100">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-black text-[#1a3a5c] tracking-tighter">Despacho de Kit</h2>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{pedidoActual?.hallazgo?.puntoFalla}</p>
+              </div>
+              <button onClick={() => setModalAbierto(false)} className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-slate-600">
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Card de Recomendación Técnica */}
+              <div className="mb-6 p-4 bg-[#1a3a5c] rounded-2xl relative overflow-hidden shadow-lg shadow-blue-900/20">
+                <div className="relative z-10 flex justify-between items-center">
+                  <div>
+                    <p className="text-[9px] font-black text-blue-300 uppercase tracking-widest mb-1">Grado Sugerido</p>
+                    <p className="text-lg font-black text-white italic">10W-30</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-blue-300 uppercase tracking-widest mb-1">Marca Sugerida</p>
+                    <p className="text-lg font-black text-white italic">MOBIL</p>
+                  </div>
+                </div>
+                <div className="absolute top-0 right-0 p-1 opacity-10"><svg width="80" height="80" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+              </div>
+
+              {/* Listado de Productos con Stock */}
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Stock Disponible en Sede</p>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                {opcionesKit.length > 0 ? opcionesKit.map((prod) => (
+                  <button
+                    key={prod.id}
+                    onClick={() => {
+                      if(prod.stockActual <= 0) return toast.error("Sin unidades disponibles");
+                      handleCambiarEstado(pedidoActual.id, 'ENTREGADO', prod.costoMaestroId);
+                      setModalAbierto(false);
+                    }}
+                    className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
+                  >
+                    <div className="text-left">
+                      <p className="text-xs font-black text-slate-800 uppercase group-hover:text-blue-700">{prod.costoMaestro?.nombre}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {prod.costoMaestro?.codigoParte || 'S/N'}</p>
+                    </div>
+                    <div className={`px-3 py-1 rounded-lg text-[10px] font-black ${prod.stockActual > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                      {prod.stockActual} UNID.
+                    </div>
+                  </button>
+                )) : (
+                  <div className="py-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No hay stock de este rubro</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

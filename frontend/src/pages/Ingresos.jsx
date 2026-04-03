@@ -62,7 +62,14 @@ function EstadoBadge({ estado }) {
     'EN CAMINO':   { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe', label: 'EN CAMINO' },
     'SOLICITADO':  { bg: '#fffbeb', color: '#92400e', dot: '#f59e0b', border: '#fef3c7', label: 'SOLICITADO' },
     'RECHAZADO':   { bg: '#fef2f2', color: '#991b1b', dot: '#ef4444', border: '#fee2e2', label: 'RECHAZADO' },
-    'TRANSFERIDO': { bg: '#f5f3ff', color: '#7c3aed', dot: '#8b5cf6', border: '#ddd6fe', label: 'TRANSFERIDO' },
+    
+    // 🔵 NUEVO: Para traslados que salieron del origen
+    'DESPACHADO':  { bg: '#f0f9ff', color: '#0369a1', dot: '#0ea5e9', border: '#bae6fd', label: 'DESPACHADO' },
+    
+    // 🟣 NUEVO: Para ventas entregadas al cliente
+    'ENTREGADO':   { bg: '#f5f3ff', color: '#4338ca', dot: '#6366f1', border: '#ddd6fe', label: 'ENTREGADO' },
+    
+    'TRANSFERIDO': { bg: '#fdf4ff', color: '#701a75', dot: '#d946ef', border: '#f5d0fe', label: 'TRANSFERIDO' },
   }[estado?.toUpperCase()] || { bg: '#f8fafc', color: '#94a3b8', dot: '#cbd5e1', border: '#e2e8f0', label: estado }
 
   return (
@@ -346,7 +353,13 @@ export default function MovimientosEntrada() {
     return movimientos.filter(m => {
       const matchSede   = tabActiva === 'todos' || String(m.tallerId) === String(tabActiva)
       const matchSearch = m.costoMaestro?.nombre?.toLowerCase().includes(search.toLowerCase())
-      const matchEstado = ['APROBADO', 'SOLICITADO', 'RECHAZADO', 'EN CAMINO', 'TRANSFERIDO'].includes(m.estado?.toUpperCase())
+      
+      // 🚀 AGREGAMOS 'DESPACHADO' Y 'ENTREGADO' AL FILTRO
+      const matchEstado = [
+        'APROBADO', 'SOLICITADO', 'RECHAZADO', 'EN CAMINO', 
+        'TRANSFERIDO', 'DESPACHADO', 'ENTREGADO' 
+      ].includes(m.estado?.toUpperCase())
+
       return matchSede && matchSearch && matchEstado
     })
   }, [movimientos, tabActiva, search])

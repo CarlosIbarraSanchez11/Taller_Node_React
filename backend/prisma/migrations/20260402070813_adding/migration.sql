@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `pedido` ADD COLUMN `fechaSolicitud` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);

@@ -9,49 +9,48 @@ const prisma = new PrismaClient();
 export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
   try {
     const { 
-      citaId, 
-      mecanicoId, 
-      kilometraje, 
-      nivelCombustible, 
-      inventario, 
-      observaciones,
-      gradoAceite,
-      marcaAceiteSugerida
+      citaId, mecanicoId, kilometraje, nivelCombustible, 
+      inventario, observaciones, gradoAceite, marcaAceiteSugerida 
     } = req.body;
 
-    // 📸 Procesamiento de Imágenes con Sharp
+    // 📸 [PROCESAMIENTO DE IMÁGENES] - Tu lógica de Sharp está excelente
     const files = req.files as Express.Multer.File[];
     const nombresFotos: string[] = [];
     const directory = 'uploads/ordenes/';
-
-    // 📁 Aseguramos que la carpeta exista
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory, { recursive: true });
-    }
+    if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
 
     if (files && files.length > 0) {
-      // Usamos Promise.all para procesar todas las fotos en paralelo (más rápido)
       await Promise.all(
         files.map(async (file) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           const nombreArchivo = `FOTO-${uniqueSuffix}.jpg`;
           const rutaFinal = path.join(directory, nombreArchivo);
-
           await sharp(file.buffer)
-            .rotate() 
-            .resize(1200, null, { withoutEnlargement: true })
-            .toFormat('jpeg')
-            .jpeg({ quality: 70, progressive: true }) 
+            .rotate().resize(1200, null, { withoutEnlargement: true })
+            .toFormat('jpeg').jpeg({ quality: 70, progressive: true })
             .toFile(rutaFinal);
-
           nombresFotos.push(nombreArchivo);
         })
       );
     }
 
-    // ⛓️ Transacción de Base de Datos
+    // ⛓️ [TRANSACCIÓN DE BASE DE DATOS]
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Creamos la Orden de Trabajo con los nombres de archivos comprimidos
+      // 1. Buscamos la cita y su kit
+      const citaConServicio = await tx.cita.findUnique({
+        where: { id: citaId },
+        include: { servicio: { include: { kit: true } } }
+      });
+
+      if (!citaConServicio) throw new Error("Cita no encontrada");
+
+      console.log("-----------------------------------------");
+      console.log(`🔎 BUSCANDO KIT PARA SERVICIO ID: ${citaConServicio.servicioId}`);
+      console.log(`📦 NOMBRE SERVICIO: ${citaConServicio.servicio.especialidad}`);
+      console.log(`📊 ITEMS ENCONTRADOS EN EL KIT: ${citaConServicio.servicio.kit?.length || 0}`);
+      console.log("-----------------------------------------");
+
+      // 2. Creamos la Orden de Trabajo
       const nuevaOrden = await tx.ordenTrabajo.create({
         data: {
           citaId,
@@ -62,30 +61,72 @@ export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
           marcaAceiteSugerida,
           inventario: typeof inventario === 'string' ? JSON.parse(inventario) : inventario,
           observaciones,
-          fotos: nombresFotos, // ["FOTO-123.jpg", "FOTO-456.jpg"]
+          fotos: nombresFotos,
           estado: 'RECIBIDO'
         }
       });
 
-      // 2. Actualizamos la Cita
+      // 🚀 3. EL PASO QUE FALTABA: Carga Automática de Hallazgos (Kit)
+      const kitBase = citaConServicio.servicio.kit;
+      if (kitBase && kitBase.length > 0) {
+        // Usamos for...of para poder usar el ID del hallazgo en el pedido
+        for (const insumo of kitBase) {
+          
+          // A. Creamos el Hallazgo para el Mecánico
+          const nuevoHallazgo = await tx.hallazgo.create({
+            data: {
+              ordenId: nuevaOrden.id,
+              puntoFalla: insumo.descripcion.toUpperCase(),
+              descripcion: "MATERIAL DE KIT",
+              cantidad: Math.round(insumo.cantidad),
+              precioVenta: 0,
+              total: 0,
+              estado: 'SOLICITADO' // Esto es para la vista del mecánico
+            }
+          });
+
+          // B. ⚡ CREAMOS EL PEDIDO PARA JHON (Logística)
+          await tx.pedido.create({
+            data: {
+              // Generamos un código único para Jhon
+              codigo: `KIT-${nuevaOrden.id.slice(-5)}-${Math.floor(Math.random() * 1000)}`,
+              
+              // 🚨 IMPORTANTE: Estos valores activan tus filtros de Jhon
+              tipo: 'KIT', 
+              estado: 'SOLICITADO_POR_KIT', 
+              
+              cantidad: Math.round(insumo.cantidad),
+              tallerId: citaConServicio.tallerId,
+              
+              // Usamos el ID 1 (Genérico) por ahora. 
+              // Jhon elegirá el real (Mobil, Castrol, etc.) en su modal.
+              costoMaestroId: 1, 
+              
+              hallazgoId: nuevoHallazgo.id, // Vinculamos ambos mundos
+              usuarioId: Number(mecanicoId),
+              solicitante: "SISTEMA (KIT AUTOMÁTICO)",
+              observaciones: `Insumo base para la placa: ${citaConServicio.vehiculoPlaca}`
+            }
+          });
+        }
+      }
+
+      // 4. Actualizamos la Cita
       await tx.cita.update({
         where: { id: citaId },
-        data: {
-          tecnicoId: Number(mecanicoId),
-          estado: 'EN PROCESO'
-        }
+        data: { tecnicoId: Number(mecanicoId), estado: 'EN PROCESO' }
       });
 
       return nuevaOrden;
     });
 
     res.status(201).json({
-      message: "Orden de trabajo abierta y fotos optimizadas",
+      message: "Orden abierta y Kit Base solicitado automáticamente",
       orden: resultado
     });
 
   } catch (error) {
-    console.error("Error al abrir orden:", error);
-    res.status(500).json({ error: "No se pudo procesar la recepción del vehículo" });
+    console.error("❌ Error al abrir orden:", error);
+    res.status(500).json({ error: "Fallo en la recepción" });
   }
 };

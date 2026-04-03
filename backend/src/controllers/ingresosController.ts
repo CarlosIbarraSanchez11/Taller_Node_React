@@ -16,7 +16,9 @@ export const crearIngreso = async (req: Request, res: Response) => {
     estado 
   } = req.body;
 
-  // Si es transferencia interna, empieza como SOLICITADO. Si es compra/carga, APROBADO.
+  // 🚀 LÓGICA DE ESTADO: 
+  // Si es SALIDA o CARGA/COMPRA, entra APROBADO. Si es INTERNO, SOLICITADO.
+  const esSalida = tipo === "SALIDA";
   const estadoFinal = estado || (tipo === "INTERNO" ? "SOLICITADO" : "APROBADO");
   const idParaPrisma = Number(usuarioId) || 4;
 
@@ -25,21 +27,21 @@ export const crearIngreso = async (req: Request, res: Response) => {
       const movimientosProcesados = [];
 
       for (const item of items) {
-        // A. CREAR EL REGISTRO DE MOVIMIENTO
+        // Determinamos la cantidad real (Si es salida, forzamos que sea negativa)
+        const cantidadReal = esSalida ? -Math.abs(Number(item.cantidad)) : Number(item.cantidad);
+
+        // A. CREAR EL REGISTRO DE MOVIMIENTO (Aparecerá como -1 en el historial)
         const nuevoMovimiento = await tx.ingresoStock.create({
           data: {
             tipo: tipo || "CON_RUC",
-            motivo: motivo || "CARGA_INICIAL",
-            cantidad: Number(item.cantidad),
+            motivo: motivo || (esSalida ? "VENTA_CLIENTE" : "CARGA_INICIAL"),
+            cantidad: cantidadReal, // 👈 Guardamos -1, -5, etc.
             estado: estadoFinal,
             
-            // 1. Relaciones Obligatorias (Siempre usar connect)
             costoMaestro: { connect: { id: Number(item.costoMaestroId) } },
             taller:       { connect: { id: Number(tallerId) } },
             usuario:      { connect: { id: idParaPrisma } },
 
-            // 2. Relaciones Opcionales (Solo si el ID existe)
-            // 🚀 IMPORTANTE: Usamos el nombre de la relación 'tallerOrigen', NO el ID 'tallerOrigenId'
             ...(tallerOrigenId ? { 
               tallerOrigen: { connect: { id: Number(tallerOrigenId) } } 
             } : {}),
@@ -50,8 +52,7 @@ export const crearIngreso = async (req: Request, res: Response) => {
           }
         });
 
-        // B. ACTUALIZAR STOCK REAL (Solo si entra como APROBADO)
-        // Nota: Si es "SOLICITADO", el stock no se toca hasta que se reciba.
+        // B. ACTUALIZAR STOCK REAL (Balance Global)
         if (estadoFinal === "APROBADO") {
           await tx.producto.upsert({
             where: {
@@ -60,11 +61,12 @@ export const crearIngreso = async (req: Request, res: Response) => {
                 costoMaestroId: Number(item.costoMaestroId)
               }
             },
-            update: { stockActual: { increment: Number(item.cantidad) } },
+            // 🚀 Prisma sumará el número negativo, restándolo automáticamente del total
+            update: { stockActual: { increment: cantidadReal } }, 
             create: {
               tallerId: Number(tallerId),
               costoMaestroId: Number(item.costoMaestroId),
-              stockActual: Number(item.cantidad),
+              stockActual: cantidadReal,
               stockMin: 5
             }
           });
@@ -76,13 +78,13 @@ export const crearIngreso = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ 
-      message: estadoFinal === "SOLICITADO" ? "Solicitud enviada al otro taller" : "Stock registrado", 
+      message: esSalida ? "Salida de stock registrada" : "Stock registrado", 
       data: resultado 
     });
 
   } catch (error) {
-    console.error("❌ ERROR EN CREAR INGRESO:", error);
-    res.status(500).json({ error: "Fallo al registrar el ingreso" });
+    console.error("❌ ERROR EN MOVIMIENTO:", error);
+    res.status(500).json({ error: "Fallo al registrar el movimiento" });
   }
 };
 

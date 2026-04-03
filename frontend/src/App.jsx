@@ -16,6 +16,7 @@ import Citas from './pages/Citas'
 // 1. Importamos la nueva página de recepción
 import RecepcionVehiculo from './pages/RecepcionVehiculo'
 import GestionTaller from './pages/GestionTaller'
+import VistaAprobacionCliente from './pages/VistaAprobacionCliente'
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
           <Route path="/pedidos" element={<Pedidos />} />
           <Route path="/servicios" element={<Servicios />} />
           <Route path="/citas" element={<Citas />} />
+          <Route path="/aprobacion/:ordenId" element={<VistaAprobacionCliente />} />
 
           {/* 2. Acoplamos la ruta para la Recepción de Vehículos */}
           <Route path="/recepcion" element={<RecepcionVehiculo />} />

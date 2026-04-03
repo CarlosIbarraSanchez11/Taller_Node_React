@@ -259,6 +259,10 @@ model Hallazgo {
   
   foto        String?
   estado      String       @default("POR ENVIAR") // POR ENVIAR, PENDIENTE, APROBADO, RECHAZADO
+
+  fotoInstalacion String?
+
+  pedidos     Pedido[]
   
   createdAt   DateTime     @default(now())
 }
@@ -331,6 +335,8 @@ model IngresoStock {
 
 enum PedidoEstado {
   PENDIENTE
+  SOLICITADO_POR_KIT
+  SOLICITADO_POR_CLIENTE
   DESPACHADO
   RECHAZADO
   ENTREGADO
@@ -341,6 +347,7 @@ enum PedidoTipo {
   TRANSFERENCIA
   CLIENTE
   SERVICIO
+  KIT
 }
 
 // --- MODELO DE PEDIDOS ---
@@ -353,6 +360,11 @@ model Pedido {
   placa         String?
   solicitante   String?
   observaciones String?
+
+  fechaSolicitud DateTime     @default(now())
+
+  hallazgoId     String?      
+  hallazgo       Hallazgo?    @relation(fields: [hallazgoId], references: [id])
 
   costoMaestroId Int
   costoMaestro   CostoMaestro @relation(fields: [costoMaestroId], references: [id])

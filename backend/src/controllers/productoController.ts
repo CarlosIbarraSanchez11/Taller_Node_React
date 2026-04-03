@@ -116,3 +116,47 @@ export const deleteProducto = async (req: Request, res: Response) => {
     handlePrismaError(error, res);
   }
 };
+
+// En productoController.ts
+export const buscarParaEntregaKit = async (req: Request, res: Response) => {
+  const { tallerId, filtroKit } = req.query; 
+
+  if (!tallerId || !filtroKit) {
+    return res.status(400).json({ error: "Faltan parámetros" });
+  }
+
+  try {
+    const busquedaLimpia = String(filtroKit).toUpperCase();
+    const buscaFiltro = busquedaLimpia.includes("FILTRO");
+
+    const productos = await prisma.producto.findMany({
+      where: {
+        tallerId: parseInt(String(tallerId)), 
+        stockActual: { gt: 0 },
+        costoMaestro: {
+          AND: [
+            {
+              OR: [
+                // 🚀 MySQL ya es case-insensitive, así que quitamos el "mode"
+                { nombre: { contains: buscaFiltro ? "FILTRO" : "ACEITE" } },
+                { categoria: { contains: String(filtroKit) } },
+                { marca: { contains: String(filtroKit) } }
+              ]
+            },
+            // 🛡️ REGLA DE EXCLUSIÓN
+            ...(!buscaFiltro 
+              ? [{ nombre: { not: { contains: "FILTRO" } } }] 
+              : []
+            )
+          ]
+        }
+      },
+      include: { costoMaestro: true }
+    });
+    
+    res.json(productos);
+  } catch (error: any) {
+    console.error("❌ Error en Prisma:", error);
+    res.status(500).json({ error: error.message });
+  }
+};

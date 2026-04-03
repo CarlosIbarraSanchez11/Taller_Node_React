@@ -5,45 +5,64 @@ const prisma = new PrismaClient();
 
 // 1. CREAR UN NUEVO PEDIDO (Mantenemos la creación inicial)
 export const crearPedido = async (req: Request, res: Response) => {
-  const { costoMaestroId, cantidad, tallerId, tallerOrigenId, usuarioId } = req.body;
+  const { 
+    costoMaestroId, 
+    cantidad, 
+    tallerId, 
+    tallerOrigenId, 
+    usuarioId, 
+    tipo, // 🚀 'CLIENTE' o 'TRANSFERENCIA'
+    placa, 
+    solicitante 
+  } = req.body;
 
   try {
     const resultado = await prisma.$transaction(async (tx) => {
+      // 1. Obtenemos el nombre del taller para el campo solicitante si no viene uno
       const tallerDestino = await tx.taller.findUnique({
         where: { id: Number(tallerId) }
       });
 
-      const nombreSolicitante = tallerDestino 
-        ? `Solicitante: ${tallerDestino.nombre}` 
-        : "Taller Solicitante";
+      const nombreSolicitante = solicitante || (tallerDestino 
+        ? `Taller: ${tallerDestino.nombre}` 
+        : "Solicitante General");
 
       const codigo = `PED-${Date.now().toString().slice(-7)}`;
 
+      // 2. CREAR EL PEDIDO
       const nuevoPedido = await tx.pedido.create({
         data: {
           codigo,
           cantidad: Number(cantidad),
           estado: "PENDIENTE",
+          
+          // 🚀 CORRECCIÓN AQUÍ: Aseguramos que solo mande valores válidos del Enum
+          tipo: tipo === "CLIENTE" ? "CLIENTE" : "TRANSFERENCIA", 
+          
+          placa: placa || null,
           solicitante: nombreSolicitante,
           costoMaestroId: Number(costoMaestroId),
           tallerId: Number(tallerId),
           usuarioId: Number(usuarioId) || 4,
-          tallerOrigenId: Number(tallerOrigenId)
+          tallerOrigenId: tallerOrigenId ? Number(tallerOrigenId) : null
         }
       });
 
+      // 3. REGISTRAR EN EL HISTORIAL (IngresoStock)
+      // Nota: Si es pedido, se crea como "SOLICITADO" (cantidad positiva porque es lo que esperamos que llegue)
       await tx.ingresoStock.create({
         data: {
-          tipo: "INTERNO",
-          motivo: "TRANSFERENCIA",
-          cantidad: Number(cantidad),
+          tipo: tipo === "CLIENTE" ? "VENTA" : "INTERNO", 
+          motivo: tipo === "CLIENTE" ? "VENTA_CLIENTE" : "TRANSFERENCIA",
+          
+          // 🚀 DINÁMICO: Aquí usamos la cantidad que viene del req.body
+          cantidad: Number(cantidad), 
+          
           estado: "SOLICITADO", 
           costoMaestroId: Number(costoMaestroId),
           tallerId: Number(tallerId),
-          tallerOrigenId: Number(tallerOrigenId),
-          usuarioId: Number(usuarioId) || 4,
-          // 💡 Sugerencia: Si puedes, añade pedidoId a tu modelo de IngresoStock
-          // pedidoId: nuevoPedido.id 
+          tallerOrigenId: tallerOrigenId ? Number(tallerOrigenId) : null,
+          usuarioId: Number(usuarioId) || 4
         }
       });
 
@@ -63,116 +82,132 @@ export const obtenerPedidos = async (req: Request, res: Response) => {
 
   try {
     const pedidos = await prisma.pedido.findMany({
-      where: {
-        ...( (rol === 'ADMIN' || rol === 'GERENTE') 
-          ? {} 
-          : { tallerOrigenId: Number(tallerId) } 
-        )
-      },
+      where: { /* tus filtros */ },
       include: {
         costoMaestro: true,
-        taller: true,       // Taller que solicita (Destino)
-        tallerOrigen: true, // 🚀 ¡ESTA ES LA CLAVE! Agrégalo para que no falle el include
-        usuario: { select: { nombre: true } }
+        taller: true,
+        tallerOrigen: true,
+        usuario: { select: { nombre: true } },
+        hallazgo: true // 🚀 ESTE ES EL QUE TRAE "ACEITE DE MOTOR"
       },
       orderBy: { createdAt: 'desc' }
     });
 
     res.json(pedidos);
   } catch (error) {
-    console.error("Error al refrescar pedidos:", error);
     res.status(500).json({ error: "Fallo al obtener la lista de pedidos" });
   }
 };
 
-// 3. ACTUALIZAR ESTADO (Aquí es donde ocurre la magia de la sincronización)
+// 3. ACTUALIZAR ESTADO (Sincronización Total)
 export const actualizarEstadoPedido = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { nuevoEstado, motivoRechazo, usuarioId } = req.body; 
+  // 🚀 EXTRAEMOS 'costoMaestroIdReal' que viene del modal de Jhon
+  const { nuevoEstado, motivoRechazo, usuarioId, costoMaestroIdReal } = req.body; 
 
   try {
     const resultado = await prisma.$transaction(async (tx) => {
-      const pedido = await tx.pedido.findUnique({ where: { id: Number(id) } });
+      const pedido = await tx.pedido.findUnique({ 
+        where: { id: Number(id) },
+        include: { hallazgo: true } 
+      });
       if (!pedido) throw new Error("Pedido no encontrado");
 
-      // --- 🚛 LÓGICA DE DESPACHO ---
+      // Determinamos qué ID usar: el que eligió Jhon en el modal o el original del pedido
+      const idFinalProducto = costoMaestroIdReal ? Number(costoMaestroIdReal) : pedido.costoMaestroId;
+
+      // --- 🚛 1. LÓGICA DE DESPACHO (Se mantiene tu lógica) ---
       if (nuevoEstado === "DESPACHADO") {
         await tx.producto.update({
-          where: {
-            costoMaestroId_tallerId: {
-              tallerId: pedido.tallerOrigenId!,
-              costoMaestroId: pedido.costoMaestroId
-            }
-          },
+          where: { costoMaestroId_tallerId: { 
+            tallerId: pedido.tallerOrigenId || pedido.tallerId, 
+            costoMaestroId: pedido.costoMaestroId 
+          } },
           data: { stockActual: { decrement: pedido.cantidad } }
-        });
-
-        await tx.ingresoStock.updateMany({
-          where: {
-            costoMaestroId: pedido.costoMaestroId,
-            tallerId: pedido.tallerId,
-            tallerOrigenId: pedido.tallerOrigenId,
-            estado: "SOLICITADO"
-          },
-          data: { estado: "EN CAMINO" }
         });
 
         await tx.ingresoStock.create({
           data: {
-            tipo: "INTERNO",
-            motivo: "SALIDA_TRANSFERENCIA",
-            cantidad: Number(pedido.cantidad) * -1,
-            estado: "TRANSFERIDO",
+            tipo: "SALIDA",
+            motivo: String(pedido.tipo) === 'KIT' ? "KIT_SERVICIO" : (String(pedido.tipo) === 'CLIENTE' ? "VENTA_CLIENTE" : "TRANSFERENCIA_SALIDA"),
+            cantidad: -Math.abs(pedido.cantidad),
+            estado: "DESPACHADO",
             costoMaestroId: pedido.costoMaestroId,
-            tallerId: pedido.tallerOrigenId!,
-            tallerOrigenId: pedido.tallerId,
-            usuarioId: Number(usuarioId) || 4 
+            tallerId: pedido.tallerOrigenId || pedido.tallerId,
+            usuarioId: usuarioId || 4
           }
         });
       }
 
-      // --- ✅ LÓGICA DE ENTREGA ---
+      // --- ✅ 2. LÓGICA DE ENTREGA (¡Aquí es donde descontamos el Stock Real!) ---
       if (nuevoEstado === "ENTREGADO") {
-        await tx.producto.upsert({
-          where: { costoMaestroId_tallerId: { tallerId: pedido.tallerId, costoMaestroId: pedido.costoMaestroId } },
-          update: { stockActual: { increment: pedido.cantidad } },
-          create: { tallerId: pedido.tallerId, costoMaestroId: pedido.costoMaestroId, stockActual: pedido.cantidad }
-        });
+        
+        // 📦 CASO: ES UN KIT o VENTA DIRECTA (Descuento de stock local inmediato)
+        if (String(pedido.tipo) === 'KIT' || String(pedido.tipo) === 'CLIENTE') {
+          
+          // A. RESTAMOS STOCK del producto REAL elegido en el modal
+          await tx.producto.update({
+            where: { costoMaestroId_tallerId: { 
+              tallerId: pedido.tallerId, 
+              costoMaestroId: idFinalProducto 
+            } },
+            data: { stockActual: { decrement: pedido.cantidad } }
+          });
 
-        await tx.ingresoStock.updateMany({
-          where: { costoMaestroId: pedido.costoMaestroId, tallerId: pedido.tallerId, tallerOrigenId: pedido.tallerOrigenId, estado: "EN CAMINO" },
-          data: { estado: "APROBADO" }
-        });
+          // B. REGISTRAMOS SALIDA en el historial
+          await tx.ingresoStock.create({
+            data: {
+              tipo: "SALIDA",
+              motivo: String(pedido.tipo) === 'KIT' ? "KIT_SERVICIO" : "VENTA_CLIENTE",
+              cantidad: -Math.abs(pedido.cantidad),
+              estado: "ENTREGADO",
+              costoMaestroId: idFinalProducto,
+              tallerId: pedido.tallerId,
+              usuarioId: usuarioId || 4
+            }
+          });
+
+          // C. SINCRONIZAMOS CON EL MECÁNICO (Hallazgo -> RECIBIDO)
+          if (pedido.hallazgoId) {
+            await tx.hallazgo.update({
+              where: { id: pedido.hallazgoId },
+              data: { estado: 'RECIBIDO' }
+            });
+          }
+        } 
+        
+        // 🚛 CASO: TRANSFERENCIA ENTRE SEDES (Lógica de llegada)
+        else {
+          await tx.producto.upsert({
+            where: { costoMaestroId_tallerId: { tallerId: pedido.tallerId, costoMaestroId: pedido.costoMaestroId } },
+            update: { stockActual: { increment: pedido.cantidad } },
+            create: { tallerId: pedido.tallerId, costoMaestroId: pedido.costoMaestroId, stockActual: pedido.cantidad }
+          });
+        }
       }
 
-      // --- ❌ LÓGICA DE RECHAZO ---
+      // --- ❌ 3. LÓGICA DE RECHAZO ---
       if (nuevoEstado === "RECHAZADO") {
-        // 🚀 Sincronizamos el historial para que pase a gris/tachado
-        await tx.ingresoStock.updateMany({
-          where: {
-            costoMaestroId: pedido.costoMaestroId,
-            tallerId: pedido.tallerId,
-            estado: "SOLICITADO",
-            tipo: "INTERNO"
-          },
-          data: { estado: "RECHAZADO" }
-        });
+        if (pedido.hallazgoId) {
+          await tx.hallazgo.update({ where: { id: pedido.hallazgoId }, data: { estado: 'POR ENVIAR' } });
+        }
       }
 
-      // 🎯 UPDATE ÚNICO DEL PEDIDO (Consolidado al final)
+      // 🎯 ACTUALIZACIÓN FINAL DEL PEDIDO
+      // Si fue un Kit, actualizamos el costoMaestroId al ID REAL entregado (Auditoría)
       return await tx.pedido.update({
         where: { id: Number(id) },
         data: {
           estado: nuevoEstado,
-          // Guardamos el motivo si existe, si no, un texto por defecto
-          observaciones: motivoRechazo || (nuevoEstado === "RECHAZADO" ? "Pedido rechazado" : null)
+          costoMaestroId: idFinalProducto, 
+          observaciones: motivoRechazo || null
         }
       });
     });
 
     res.json({ data: resultado });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error en el flujo logístico" });
+  } catch (error: any) {
+    console.error("❌ ERROR LOGÍSTICO:", error.message);
+    res.status(500).json({ error: error.message });
   }
 };
