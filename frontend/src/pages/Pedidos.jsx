@@ -103,55 +103,84 @@ export default function Pedidos() {
   // 🚀 3. Filtrado de la Tabla
   const filtrados = useMemo(() => {
     let d = pedidos.filter(p => {
-      // Filtro de Sede
-      const matchTaller = tabTallerActiva === 'todos' || 
-                          Number(p.tallerOrigenId) === Number(tabTallerActiva) || 
-                          Number(p.tallerId) === Number(tabTallerActiva);
+      // 🎯 1. FILTRO DE SEDE (LA CLAVE DEL BUG)
+      const idActivo = Number(tabTallerActiva);
+      const esTransferencia = p.tipo === 'TRANSFERENCIA';
       
-      // Filtro de Proceso (Pendientes vs Historial)
-      const matchEstado = filtroTab === 'PENDIENTES' 
-      ? (
-          p.estado === 'PENDIENTE' || 
-          p.estado === 'DESPACHADO' || 
-          p.estado === 'SOLICITADO_POR_CLIENTE' || // 🚀 AGREGA ESTA LÍNEA
-          p.estado === 'SOLICITADO_POR_KIT'
-        ) 
-      : (
-          p.estado === 'ENTREGADO' || 
-          p.estado === 'RECHAZADO'
-        );
+      let matchTaller = false;
 
-      // Buscador
+      if (tabTallerActiva === 'todos') {
+        matchTaller = true;
+      } else {
+        if (filtroTab === 'PENDIENTES') {
+          // 🚀 LÓGICA DE ACCIÓN:
+          if (esTransferencia) {
+            // Si es transferencia, SOLO aparece en la sede que debe ENVIAR (Origen)
+            matchTaller = Number(p.tallerOrigenId) === idActivo;
+          } else {
+            // Si es Kit o Hallazgo, aparece en la sede que lo generó (Local)
+            matchTaller = Number(p.tallerId) === idActivo;
+          }
+        } else {
+          // En el HISTORIAL sí lo ven ambos para que quede el registro de qué salió y qué entró
+          matchTaller = Number(p.tallerOrigenId) === idActivo || Number(p.tallerId) === idActivo;
+        }
+      }
+
+      // 🎯 2. FILTRO DE PROCESO (ESTADOS)
+      const matchEstado = filtroTab === 'PENDIENTES' 
+        ? [
+            'PENDIENTE', 
+            'DESPACHADO', 
+            'SOLICITADO_POR_CLIENTE', 
+            'SOLICITADO_POR_KIT',
+            'SOLICITADO' // 👈 Por si en el backend guardas algunos así
+          ].includes(p.estado)
+        : ['ENTREGADO', 'RECHAZADO'].includes(p.estado);
+
+      // 🎯 3. BUSCADOR
       const q = search.toLowerCase();
-      const matchSearch = p.codigo.toLowerCase().includes(q) || 
-                          (p.costoMaestro?.nombre || '').toLowerCase().includes(q) ||
-                          (p.placa || '').toLowerCase().includes(q);
+      const matchSearch = 
+        p.codigo.toLowerCase().includes(q) || 
+        (p.costoMaestro?.nombre || '').toLowerCase().includes(q) ||
+        (p.placa || '').toLowerCase().includes(q) ||
+        (p.solicitante || '').toLowerCase().includes(q);
 
       return matchTaller && matchEstado && matchSearch;
     });
 
+    // 🎯 4. ORDENAMIENTO
     return d.sort((a, b) => {
       const valA = a[sort.col] || '';
       const valB = b[sort.col] || '';
-      return sort.dir === 'asc' ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+      
+      if (sort.col === 'createdAt') {
+        return sort.dir === 'asc' 
+          ? new Date(valA) - new Date(valB) 
+          : new Date(valB) - new Date(valA);
+      }
+      
+      return sort.dir === 'asc' 
+        ? String(valA).localeCompare(String(valB)) 
+        : String(valB).localeCompare(String(valA));
     });
-  }, [pedidos, tabTallerActiva, filtroTab, search, sort])
+  }, [pedidos, tabTallerActiva, filtroTab, search, sort]);
 
   // 🚀 4. Handlers de Acción
-  const handleCambiarEstado = async (id, nuevoEstado) => {
+  const handleCambiarEstado = async (id, nuevoEstado, costoMaestroIdReal = null) => {
     if (!window.confirm(`¿Confirmar ${nuevoEstado} de este repuesto?`)) return;
 
     try {
-      // 1. Enviamos la actualización
+      // 1. Enviamos la actualización con la data completa
       await api.patch(`/pedidos/${id}/estado`, { 
         nuevoEstado,
-        usuarioId: user.id 
+        usuarioId: user.id,
+        // 🚀 VITAL: Enviamos el ID real que Jhon eligió en el modal
+        costoMaestroIdReal: costoMaestroIdReal 
       });
       
-      // 2. Si el patch funcionó, mostramos el éxito
       toast.success("¡Operación realizada con éxito!");
 
-      // 3. Intentamos refrescar, pero de forma segura
       try {
         await fetchData(); 
       } catch (err) {
@@ -159,7 +188,6 @@ export default function Pedidos() {
       }
 
     } catch (error) {
-      // 4. Solo si el PATCH falla de verdad, mostramos el rojo
       console.error(error);
       toast.error("No se pudo procesar el cambio de estado");
     }

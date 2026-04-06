@@ -307,12 +307,8 @@ export const responderHallazgo = async (req: Request, res: Response) => {
                     costoMaestroId: hallazgoActualizado.costoMaestroId!, 
                     cantidad: hallazgoActualizado.cantidad,
                     
-                    // 🏢 TALLER DESTINO (El que necesita el repuesto)
                     tallerId: Number(hallazgoActualizado.orden.cita.tallerId),
                     
-                    // 🚀 LA PIEZA QUE FALTA: TALLER ORIGEN (El que debe despachar)
-                    // Si tu Almacén Central es el ID 1, pon 1. 
-                    // Si quieres que le llegue al de logística del mismo taller, usa el mismo tallerId.
                     tallerOrigenId: Number(hallazgoActualizado.orden.cita.tallerId), 
                     
                     usuarioId: hallazgoActualizado.orden.cita.tecnicoId, 
@@ -365,7 +361,6 @@ export const subirEvidenciaInstalacion = async (req: Request, res: Response) => 
     }
 };
 
-// 🗑️ FUNCIÓN 2: ELIMINAR EVIDENCIA
 export const eliminarEvidenciaInstalacion = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -382,5 +377,37 @@ export const eliminarEvidenciaInstalacion = async (req: Request, res: Response) 
         res.json({ message: "Evidencia eliminada" });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+export const terminarTrabajo = async (req: Request, res: Response) => {
+    const { id } = req.params; // El ID de la cita
+
+    try {
+        // 🎯 Actualizamos la cita
+        const citaActualizada = await prisma.cita.update({
+            where: { id: id },
+            data: { 
+                estado: 'EN LAVADO',
+                updatedAt: new Date() // Siempre es bueno trackear la última actualización
+            }
+        });
+
+        // 💡 OPCIONAL: Si también quieres cerrar la Orden de Trabajo al mismo tiempo
+        /*
+        await prisma.ordenTrabajo.updateMany({
+            where: { citaId: id },
+            data: { estado: 'FINALIZADO_TECNICO' }
+        });
+        */
+
+        res.json({
+            message: "¡Trabajo técnico finalizado! Vehículo enviado a lavado.",
+            cita: citaActualizada
+        });
+
+    } catch (error: any) {
+        console.error("❌ Error al terminar trabajo:", error);
+        res.status(500).json({ error: "No se pudo finalizar el proceso técnico." });
     }
 };

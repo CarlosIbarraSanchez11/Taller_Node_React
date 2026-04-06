@@ -17,6 +17,8 @@ import Citas from './pages/Citas'
 import RecepcionVehiculo from './pages/RecepcionVehiculo'
 import GestionTaller from './pages/GestionTaller'
 import VistaAprobacionCliente from './pages/VistaAprobacionCliente'
+import Lavado from './pages/Lavado'
+import Checkout from './pages/Checkout'
 
 function App() {
   return (
@@ -52,6 +54,8 @@ function App() {
           {/* 2. Acoplamos la ruta para la Recepción de Vehículos */}
           <Route path="/recepcion" element={<RecepcionVehiculo />} />
           <Route path="/gestion-taller" element={<GestionTaller />} />
+          <Route path="/lavado" element={<Lavado />} />
+          <Route path="/checkout" element={<Checkout />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

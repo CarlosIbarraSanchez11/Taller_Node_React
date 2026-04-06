@@ -18,6 +18,8 @@ import clienteRoutes from './routes/clienteRoutes';
 import citaRoutes from './routes/citaRoutes';
 import ordenRoutes from './routes/ordenRoutes';
 import gestionRoutes from './routes/gestionRoutes';
+import lavadoRoutes from './routes/lavadoRoutes';
+import checkoutRoutes from './routes/checkoutRoutes';
 
 dotenv.config();
 
@@ -50,6 +52,8 @@ app.use('/api/clientes', clienteRoutes);
 app.use('/api/citas', citaRoutes);
 app.use('/api/ordenes', ordenRoutes);
 app.use('/api/gestion', gestionRoutes);
+app.use('/api/lavado', lavadoRoutes);
+app.use('/api/checkout', checkoutRoutes);
 
 app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);

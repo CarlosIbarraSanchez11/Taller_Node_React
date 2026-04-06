@@ -62,37 +62,42 @@ const GestionTaller = () => {
     const [subiendoEvidencia, setSubiendoEvidencia] = useState(false);   // Para el loader del botón
 
     useEffect(() => {
-        // 1. Definimos la función de carga (la mantenemos igual)
-        const cargarGestion = async () => {
+        const cargarDatosIniciales = async () => {
             try {
                 const res = await axios.get(`http://localhost:4000/api/gestion/${idCita}`);
                 setDatosCita(res.data);
-                
                 if (res.data.ordenTrabajo?.hallazgos) {
                     setHallazgos(res.data.ordenTrabajo.hallazgos);
                 }
-                setInspeccion(res.data.inspeccionActual || {});
-                
-            } catch (err) { 
-                console.error("Error cargando:", err); 
-            } finally { 
-                setLoading(false); 
+                setInspeccion(res.data.inspeccionActual || {}); // ✅ Solo al inicio
+            } catch (err) {
+                console.error("Error cargando:", err);
+            } finally {
+                setLoading(false);
             }
         };
 
-        // 2. La ejecutamos de inmediato al entrar
+        // 🔄 Sync liviano — NUNCA toca inspeccion
+        const sincronizarEstados = async () => {
+            try {
+                const res = await axios.get(`http://localhost:4000/api/gestion/${idCita}`);
+                setDatosCita(res.data);
+                if (res.data.ordenTrabajo?.hallazgos) {
+                    setHallazgos(res.data.ordenTrabajo.hallazgos); // ✅ Solo hallazgos
+                }
+            } catch (err) {
+                console.error("Error en sync:", err);
+            }
+        };
+
         if (idCita) {
-            cargarGestion();
+            cargarDatosIniciales(); // Carga completa solo una vez
 
-            // 3. 🚀 ESTE ES EL CAMBIO: Creamos el intervalo
-            // 20000 ms = 20 segundos. Puedes ponerle 30000 (30 seg) si prefieres.
             const intervalo = setInterval(() => {
-                console.log("🔄 Sincronizando estados con el servidor...");
-                cargarGestion();
-            }, 20000); 
+                console.log("🔄 Sincronizando hallazgos...");
+                sincronizarEstados(); // Cada 20s solo toca hallazgos
+            }, 20000);
 
-            // 4. 🧹 MUY IMPORTANTE: Limpiar el intervalo al salir
-            // Esto evita que la app se ponga lenta o que el navegador colapse
             return () => clearInterval(intervalo);
         }
     }, [idCita]);
@@ -251,44 +256,76 @@ const GestionTaller = () => {
         }
     };
 
+    const isInspeccionCompleta = progresoLocal === 100;
+    const tieneFotosInstalacion = hallazgos.some(h => h.fotoInstalacion);
+    const canFinish = isInspeccionCompleta && tieneFotosInstalacion;
+
+    const totalRepuestos = hallazgos.reduce((acc, h) => acc + h.total, 0);
+    const precioManoObra = Number(datosCita?.servicio?.precioBase || 0);
+    const totalFinal = totalRepuestos + precioManoObra;
+
     const handleGuardarEvidencia = async () => {
-    if (!hallazgoAEvidenciar || !fotoEvidencia) {
-        return toast.error("Selecciona un repuesto y toma la foto");
-    }
+        if (!hallazgoAEvidenciar || !fotoEvidencia) {
+            return toast.error("Selecciona un repuesto y toma la foto");
+        }
 
-    setSubiendoEvidencia(true);
-    const formData = new FormData();
-    formData.append('foto', fotoEvidencia);
-    formData.append('usuarioId', user?.id || 4); // 👈 Ahora sí reconoce 'user'
+        setSubiendoEvidencia(true);
+        const formData = new FormData();
+        formData.append('foto', fotoEvidencia);
+        formData.append('usuarioId', user?.id || 4);
 
-    try {
-        // 🎯 IMPORTANTE: Usa la URL completa o tu instancia 'api'
-        await axios.patch(`http://localhost:4000/api/gestion/hallazgos/${hallazgoAEvidenciar}/evidencia`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        try {
+            const response = await axios.patch(
+                `http://localhost:4000/api/gestion/hallazgos/${hallazgoAEvidenciar}/evidencia`, 
+                formData, 
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
 
-        toast.success("¡Evidencia guardada!");
-        setFotoEvidencia(null);
-        setHallazgoAEvidenciar('');
-        
-        cargarGestion(); // 👈 CAMBIADO: Usamos tu función para refrescar
-    } catch (error) {
-        toast.error("Error al subir la foto");
-    } finally {
-        setSubiendoEvidencia(false);
-    }
-};
+            toast.success("¡Evidencia guardada!");
+            setFotoEvidencia(null);
+            setHallazgoAEvidenciar('');
+
+            // ✅ Solo actualizamos hallazgos localmente, sin tocar inspeccion
+            const hallazgoEditado = response.data;
+            setHallazgos(prev => prev.map(h => h.id === hallazgoEditado.id ? hallazgoEditado : h));
+
+        } catch (error) {
+            console.error("Error real en la subida:", error);
+            toast.error("Error al conectar con el servidor");
+        } finally {
+            setSubiendoEvidencia(false);
+        }
+    };
 
     const handleEliminarEvidencia = async (id) => {
-    if (!window.confirm("¿Eliminar esta evidencia?")) return;
-    try {
-        await axios.patch(`http://localhost:4000/api/gestion/hallazgos/${id}/evidencia-eliminar`);
-        toast.success("Evidencia eliminada");
-        cargarGestion(); // 👈 CAMBIADO: Refrescamos la lista
-    } catch (error) {
-        toast.error("No se pudo borrar");
-    }
-};
+        if (!window.confirm("¿Eliminar esta evidencia?")) return;
+        try {
+            await axios.patch(`http://localhost:4000/api/gestion/hallazgos/${id}/evidencia-eliminar`);
+            toast.success("Evidencia eliminada");
+            // ✅ Solo actualizamos hallazgos localmente, sin tocar inspeccion
+            setHallazgos(prev => prev.map(h => h.id === id ? { ...h, fotoInstalacion: null } : h));
+        } catch (error) {
+            toast.error("No se pudo borrar");
+        }
+    };
+
+
+    const handleTerminarTrabajo = async () => {
+        if (!window.confirm("¿Estás seguro de finalizar el trabajo? El vehículo pasará a LAVADO.")) return;
+        
+        setProcesando(true);
+        try {
+            // 🎯 Cambiamos el estado de la CITA a "EN LAVADO"
+            await axios.patch(`http://localhost:4000/api/gestion/terminar-trabajo/${idCita}`);
+            
+            toast.success("¡Trabajo finalizado! El vehículo pasó a Lavado.");
+            navigate('/citas'); // Regresamos a la agenda
+        } catch (error) {
+            toast.error("Error al finalizar el trabajo");
+        } finally {
+            setProcesando(false);
+        }
+    };
 
     if (loading) return <div className="p-20 text-center font-black text-blue-500 animate-pulse text-xl">🚀 Sincronizando...</div>;
 
@@ -561,9 +598,9 @@ const GestionTaller = () => {
                                                                 <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-[9px] font-black uppercase">
                                                                     🚚 EN CAMINO
                                                                 </span>
-                                                            ) : h.estado === 'RECIBIDO' ? (
-                                                                <span className="bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full text-[9px] font-black uppercase">
-                                                                    📦 RECIBIDO
+                                                            ) : h.estado === 'RECIBIDO' || h.estado === 'ENTREGADO' || h.estado === 'INSTALADO' ? ( // 🚀 AGREGAMOS ENTREGADO AQUÍ
+                                                                <span className="bg-emerald-500 text-white px-2 py-1 rounded-full text-[9px] font-black uppercase shadow-sm">
+                                                                    ✅ ENTREGADO
                                                                 </span>
                                                             ) : (
                                                                 <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full text-[9px] font-black uppercase">
@@ -600,7 +637,7 @@ const GestionTaller = () => {
                                 <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Completados</p>
                                     <p className="text-sm font-black text-[#1a3a5c] text-center">
-                                        {hallazgos.filter(h => h.fotoInstalacion).length} / {hallazgos.filter(h => h.estado === 'RECIBIDO' || h.fotoInstalacion).length}
+                                        {hallazgos.filter(h => h.fotoInstalacion).length} / {hallazgos.filter(h => h.estado === 'ENTREGADO' || h.fotoInstalacion).length}
                                     </p>
                                 </div>
                             </div>
@@ -617,7 +654,7 @@ const GestionTaller = () => {
                                         onChange={(e) => setHallazgoAEvidenciar(e.target.value)}
                                     >
                                         <option value="">-- SELECCIONAR --</option>
-                                        {hallazgos.filter(h => h.estado === 'RECIBIDO' && !h.fotoInstalacion).map(h => (
+                                        {hallazgos.filter(h => h.estado === 'RECIBIDO' || h.estado ==='ENTREGADO' && !h.fotoInstalacion).map(h => (
                                             <option key={h.id} value={h.id}>
                                                 {h.puntoFalla}
                                             </option>
@@ -700,6 +737,63 @@ const GestionTaller = () => {
                                 )}
                             </div>
 
+                        </div>
+                    </div>
+
+                    {/* --- BLOQUE FINAL: RESUMEN Y TERMINAR --- */}
+                    <div className="col-span-12 mt-12 bg-[#1a1c1e] text-white p-10 rounded-[2.5rem] shadow-2xl">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                            
+                            {/* Desglose de Costos */}
+                            <div className="flex gap-10 border-r border-gray-700">
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase mb-1">Repuestos</p>
+                                    <p className="text-xl font-black">S/ {totalRepuestos.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase mb-1">Mano Obra</p>
+                                    <p className="text-xl font-black">S/ {precioManoObra.toFixed(2)}</p>
+                                </div>
+                            </div>
+
+                            {/* Requisitos Checklist */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black text-gray-500 uppercase mb-2">Requisitos para terminar:</p>
+                                <div className="flex items-center gap-2 text-[11px] font-bold">
+                                    <span>{isInspeccionCompleta ? '✅' : '❌'}</span>
+                                    <span className={isInspeccionCompleta ? 'text-emerald-400' : 'text-red-400'}>
+                                        Inspección técnica al 100%
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] font-bold">
+                                    <span>{tieneFotosInstalacion ? '✅' : '❌'}</span>
+                                    <span className={tieneFotosInstalacion ? 'text-emerald-400' : 'text-red-400'}>
+                                        Mínimo una foto de instalación cargada
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Total y Botón */}
+                            <div className="text-right flex flex-col items-end">
+                                <div className="mb-4">
+                                    <p className="text-4xl font-black text-cyan-400">S/ {totalFinal.toFixed(2)}</p>
+                                    <p className="text-[9px] font-black text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg mt-1">
+                                        ⚠️ PRECIOS NO INCLUYEN IGV
+                                    </p>
+                                </div>
+                                
+                                <button 
+                                    onClick={handleTerminarTrabajo}
+                                    disabled={!canFinish || procesando}
+                                    className={`w-full md:w-auto px-10 py-4 rounded-2xl font-black text-sm transition-all shadow-lg ${
+                                        canFinish 
+                                        ? 'bg-emerald-500 hover:bg-emerald-600 hover:scale-105 active:scale-95' 
+                                        : 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                                    }`}
+                                >
+                                    {procesando ? 'PROCESANDO...' : '🏁 TERMINAR TRABAJO'}
+                                </button>
+                            </div>
                         </div>
                     </div>
 

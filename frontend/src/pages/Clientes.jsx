@@ -306,7 +306,7 @@ export default function Clientes() {
 
   const renderEstadoCita = (cliente) => {
     const citaActiva = cliente.vehiculos.some(v => 
-      v.citas.some(c => c.estado === 'PENDIENTE' || c.estado === 'EN PROCESO')
+      v.citas.some(c => c.estado === 'PENDIENTE' || c.estado === 'EN PROCESO' || c.estado === 'EN LAVADO' || C.estado === 'POR ENTREGAR')
     );
 
     if (citaActiva) {
@@ -376,7 +376,7 @@ export default function Clientes() {
 
                 // 1. CAMBIO CLAVE: Buscamos la cita específica para tener el objeto completo
                 const citaActiva = c.vehiculos?.flatMap(veh => veh.citas || [])
-                  .find(cita => cita.estado === 'PENDIENTE' || cita.estado === 'EN PROCESO');
+                  .find(cita => cita.estado === 'PENDIENTE' || cita.estado === 'EN PROCESO' || cita.estado === 'EN LAVADO' || cita.estado === 'POR ENTREGAR' );
 
                 // 2. Definimos el booleano para el bloqueo del botón
                 const tieneCitaActiva = Boolean(citaActiva);

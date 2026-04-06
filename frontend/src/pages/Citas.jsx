@@ -132,30 +132,63 @@ const Citas = () => {
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-600">• {cita.tecnico?.nombre}</td>
                   <td className="px-4 py-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${cita.estado === 'PENDIENTE' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
-                      {cita.estado}
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-sm border ${
+                        cita.estado === 'PENDIENTE' 
+                            ? 'bg-orange-100 text-orange-600 border-orange-200' : 
+                        cita.estado === 'EN LAVADO' 
+                            ? 'bg-cyan-100 text-cyan-600 border-cyan-200' :
+                        cita.estado === 'POR ENTREGAR'
+                            ? 'bg-sky-500 text-white border-sky-600' : // 🚀 Resalta porque ya está listo
+                        'bg-green-100 text-green-600 border-green-200'
+                    }`}>
+                        {cita.estado}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-center">
                     <div className="flex justify-center gap-2">
-                      {/* 🚀 LÓGICA DINÁMICA DE BOTONES */}
-                      {cita.estado === 'PENDIENTE' ? (
+                      
+                      {/* 1. Si está PENDIENTE: Iniciar Recepción */}
+                      {cita.estado === 'PENDIENTE' && (
                         <button 
                           onClick={() => abrirAsignarEquipo(cita)}
                           disabled={!puedeAccionar}
-                          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${puedeAccionar ? 'text-green-500 border-green-100 hover:bg-green-50' : 'text-gray-200 border-gray-50 cursor-not-allowed'}`}
+                          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${puedeAccionar ? 'text-green-500 border-green-100 hover:bg-green-50 shadow-sm' : 'text-gray-200 border-gray-50 cursor-not-allowed'}`}
                           title="Iniciar Recepción"
                         >▶</button>
-                      ) : (
+                      )}
+
+                      {/* 2. Si está EN PROCESO: Ir a Gestión de Taller (Mecánico) */}
+                      {cita.estado === 'EN PROCESO' && (
                         <button 
                           onClick={() => navigate(`/gestion-taller?id_cita=${cita.id}`)}
                           className="w-8 h-8 rounded-full border border-blue-100 text-blue-500 flex items-center justify-center hover:bg-blue-50 transition-colors shadow-sm"
-                          title="Gestionar Orden"
+                          title="Gestionar Orden Técnica"
                         >
                           <span className="text-xs">🛠️</span>
                         </button>
                       )}
-                      
+
+                      {/* 3. Si está EN LAVADO: Ir al nuevo módulo de Lavado */}
+                      {cita.estado === 'EN LAVADO' && (
+                        <button 
+                          onClick={() => navigate(`/lavado?id_cita=${cita.id}`)} // 🚿 Aquí redireccionas a tu nueva vista
+                          className="w-8 h-8 rounded-full border border-cyan-100 text-cyan-500 flex items-center justify-center hover:bg-cyan-50 transition-colors shadow-sm animate-pulse"
+                          title="Control de Lavado"
+                        >
+                          <span className="text-xs">🚿</span>
+                        </button>
+                      )}
+                      {cita.estado === 'POR ENTREGAR' && (
+                          <button 
+                            onClick={() => navigate(`/checkout?id_cita=${cita.id}`)} 
+                            className="w-8 h-8 rounded-full border border-yellow-200 bg-yellow-50 text-yellow-600 flex items-center justify-center hover:bg-yellow-100 transition-colors shadow-sm"
+                            title="Generar Reporte y Cobro"
+                          >
+                            <span className="text-xs">💰</span>
+                          </button>
+                      )}
+                        
+                      {/* Botón Archivar siempre al final */}
                       <button 
                         onClick={() => handleArchivar(cita.id)}
                         disabled={!puedeAccionar}

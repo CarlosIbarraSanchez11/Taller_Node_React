@@ -58,6 +58,7 @@ function SSelect({ children, accentColor, ...props }) {
 
 function EstadoBadge({ estado }) {
   const cfg = {
+    'RECIBIDO':    { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', border: '#bbf7d0', label: 'RECIBIDO' },
     'APROBADO':    { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', border: '#bbf7d0', label: 'RECIBIDO' },
     'EN CAMINO':   { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe', label: 'EN CAMINO' },
     'SOLICITADO':  { bg: '#fffbeb', color: '#92400e', dot: '#f59e0b', border: '#fef3c7', label: 'SOLICITADO' },
@@ -357,7 +358,7 @@ export default function MovimientosEntrada() {
       // 🚀 AGREGAMOS 'DESPACHADO' Y 'ENTREGADO' AL FILTRO
       const matchEstado = [
         'APROBADO', 'SOLICITADO', 'RECHAZADO', 'EN CAMINO', 
-        'TRANSFERIDO', 'DESPACHADO', 'ENTREGADO' 
+        'TRANSFERIDO', 'DESPACHADO', 'ENTREGADO', 'RECIBIDO'
       ].includes(m.estado?.toUpperCase())
 
       return matchSede && matchSearch && matchEstado
@@ -369,14 +370,16 @@ export default function MovimientosEntrada() {
 
   const manejarRecepcion = async (id) => {
     try {
-      await api.patch(`/ingresos/${id}`, { nuevoEstado: 'APROBADO' })
-      toast.success('¡Mercadería recibida! El stock ha sido actualizado.')
-      cargarDatos()
+      // 🚀 CAMBIO: Mandamos 'RECIBIDO' en lugar de 'APROBADO'
+      await api.patch(`/ingresos/${id}`, { nuevoEstado: 'APROBADO' });
+      
+      toast.success('¡Mercadería recibida! El stock ha sido actualizado.');
+      cargarDatos(); // Recargamos la lista para ver el cambio de color
     } catch (error) {
-      console.error('Error en el componente:', error)
-      toast.error('Error al procesar la recepción')
+      console.error('Error en el componente:', error);
+      toast.error('Error al procesar la recepción');
     }
-  }
+  };
 
   if (loading) return (
     <Layout tituloNavbar="Historial">
