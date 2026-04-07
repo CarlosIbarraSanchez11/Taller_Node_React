@@ -1,6 +1,18 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getGestionOrden, updateInspeccionTecnica, buscarProductosMaestro, crearHallazgoIndependiente, enviarPresupuestoWhatsApp, getHallazgosPublicos, responderHallazgo, subirEvidenciaInstalacion,eliminarEvidenciaInstalacion, terminarTrabajo} from '../controllers/gestionController';
+import { 
+    getGestionOrden, 
+    updateInspeccionTecnica, 
+    buscarProductosMaestro, 
+    crearHallazgoIndependiente, 
+    enviarPresupuestoWhatsApp, 
+    getHallazgosPublicos, 
+    getSeguimientoPublico,
+    responderHallazgo, 
+    subirEvidenciaInstalacion, 
+    eliminarEvidenciaInstalacion, 
+    terminarTrabajo 
+} from '../controllers/gestionController';
 
 const router = Router();
 
@@ -18,6 +30,7 @@ router.post('/hallazgo/:ordenId', upload.single('foto_hallazgo'), crearHallazgoI
 router.get('/buscar-maestro', buscarProductosMaestro);
 router.get('/:citaId', getGestionOrden);
 router.post('/enviar-presupuesto/:ordenId', enviarPresupuestoWhatsApp);
+router.get('/publico/seguimiento/:ordenId', getSeguimientoPublico);
 router.get('/publico/hallazgos/:ordenId', getHallazgosPublicos);
 router.put('/publico/responder-hallazgo/:id', responderHallazgo);
 router.patch('/hallazgos/:id/evidencia', upload.single('foto'), subirEvidenciaInstalacion);

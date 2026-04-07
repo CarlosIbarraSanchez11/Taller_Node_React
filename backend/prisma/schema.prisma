@@ -221,6 +221,7 @@ model OrdenTrabajo {
   // 📈 Gestión de Progreso (NUEVO)
   progreso          Int      @default(0) // 0 a 100%
   estado            String   @default("RECIBIDO") // RECIBIDO, INSPECCION, PRESUPUESTO, EJECUCION, FINALIZADO
+  notificadoSeguimiento Boolean @default(false)
 
   // 📝 Datos Técnicos de Ingreso
   kilometraje       Int

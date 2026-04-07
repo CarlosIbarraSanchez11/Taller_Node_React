@@ -87,16 +87,32 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
         
         if (!req.body.inspeccion) throw new Error("Datos de inspección no recibidos");
 
+        // 1. 🔍 BUSCAR DATOS PREVIOS (Para el flag y datos de WhatsApp)
+        const ordenPrevia = await prisma.ordenTrabajo.findUnique({
+            where: { id: ordenId },
+            include: {
+                cita: {
+                    include: {
+                        vehiculo: {
+                            include: { cliente: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!ordenPrevia) return res.status(404).json({ error: "Orden no encontrada" });
+
         const inspeccion = JSON.parse(req.body.inspeccion);
         const archivos = req.files as Express.Multer.File[] || [];
         const directory = 'uploads/gestion/';
 
         if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
 
+        // 📸 PROCESAR ARCHIVOS (Tu lógica actual)
         for (const file of archivos) {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             
-            // 📸 PROCESAR FOTOS
             if (file.fieldname.startsWith('foto_')) {
                 const [, sectorKey, pointId] = file.fieldname.split('_');
                 if (!inspeccion[sectorKey]) continue;
@@ -112,7 +128,6 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
                 if (punto) punto.foto = nombreArchivo;
             }
 
-            // 🎥 PROCESAR VIDEOS
             if (file.fieldname.startsWith('video_')) {
                 const sectorKey = file.fieldname.split('_')[1];
                 if (!inspeccion[sectorKey]) continue;
@@ -127,12 +142,7 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
                     console.log(`⏳ Comprimiendo video: ${sectorKey}`);
                     await new Promise<void>((resolve, reject) => {
                         ffmpeg(rutaTemporal)
-                            .outputOptions([
-                                '-vcodec libx264',
-                                '-crf 28', // Calidad balanceada
-                                '-preset superfast',
-                                '-movflags +faststart'
-                            ])
+                            .outputOptions(['-vcodec libx264', '-crf 28', '-preset superfast', '-movflags +faststart'])
                             .size('720x?') 
                             .on('end', () => {
                                 if (fs.existsSync(rutaTemporal)) fs.unlinkSync(rutaTemporal);
@@ -150,7 +160,7 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
             }
         }
 
-        // 📈 RECALCULAR PROGRESO (Regla: N/A o (Estado + Foto))
+        // 📈 RECALCULAR PROGRESO
         let totalPuntos = 0;
         let completados = 0;
         Object.values(inspeccion).forEach((sec: any) => {
@@ -164,7 +174,7 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
 
         const progresoFinal = totalPuntos > 0 ? Math.round((completados / totalPuntos) * 100) : 0;
 
-        // 💾 ACTUALIZAR BASE DE DATOS
+        // 💾 2. ACTUALIZAR INSPECCIÓN EN LA BASE DE DATOS
         const ordenActualizada = await prisma.ordenTrabajo.update({
             where: { id: ordenId },
             data: {
@@ -174,9 +184,35 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
             }
         });
 
+        // 🎯 3. DISPARADOR DE NOTIFICACIÓN ÚNICA (Solo si no se ha notificado antes)
+        let notificacionEnviada = false;
+
+        if (!ordenPrevia.notificadoSeguimiento) {
+            const cliente = ordenPrevia.cita.vehiculo.cliente;
+            const placa = ordenPrevia.cita.vehiculoPlaca;
+            // El link usa el CUID de la orden directamente
+            const linkSeguimiento = `http://localhost:5173/seguimiento/${ordenId}`;
+
+            console.log("-----------------------------------------");
+            console.log(`📱 ENVIANDO WSP A: ${cliente.nombres} (${cliente.telefono})`);
+            console.log(`✅ MENSAJE: Hola ${cliente.nombres}, el servicio para su vehículo ${placa} ha iniciado. Siga el avance en vivo aquí: ${linkSeguimiento}`);
+            console.log("-----------------------------------------");
+
+            // ACTUALIZAR FLAG EN BASE DE DATOS (Para que sea 1 / true)
+            await prisma.ordenTrabajo.update({
+                where: { id: ordenId },
+                data: { notificadoSeguimiento: true }
+            });
+
+            notificacionEnviada = true;
+        }
+
         console.log(`✅ Éxito. Progreso final: ${progresoFinal}%`);
-        // Devolvemos la orden completa para que el Frontend se sincronice al 100%
-        res.json({ message: "Sincronizado", ordenActualizada });
+        res.json({ 
+            message: "Sincronizado", 
+            ordenActualizada,
+            notificacionEnviada 
+        });
 
     } catch (error: any) {
         console.error("--- ❌ ERROR ---", error.message);
@@ -409,5 +445,40 @@ export const terminarTrabajo = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("❌ Error al terminar trabajo:", error);
         res.status(500).json({ error: "No se pudo finalizar el proceso técnico." });
+    }
+};
+
+export const getSeguimientoPublico = async (req: Request, res: Response) => {
+    const { ordenId } = req.params;
+    try {
+        const seguimiento = await prisma.ordenTrabajo.findUnique({
+            where: { id: ordenId },
+            select: {
+                progreso: true,
+                estado: true,
+                inspeccionTecnica: true,
+                cita: {
+                    select: {
+                        vehiculoPlaca: true,
+                        vehiculo: {
+                            select: { 
+                                marca: true, 
+                                modelo: true,
+                                // ✅ Faltaba este bloque para que el frontend reciba los nombres
+                                cliente: {
+                                    select: { nombres: true, apellidos: true }
+                                }
+                            }
+                        },
+                        servicio: { select: { especialidad: true } }
+                    }
+                }
+            }
+        });
+
+        if (!seguimiento) return res.status(404).json({ error: "No encontrado" });
+        res.json(seguimiento);
+    } catch (error) {
+        res.status(500).json({ error: "Error de servidor" });
     }
 };

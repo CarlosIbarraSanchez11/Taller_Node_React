@@ -19,6 +19,7 @@ import GestionTaller from './pages/GestionTaller'
 import VistaAprobacionCliente from './pages/VistaAprobacionCliente'
 import Lavado from './pages/Lavado'
 import Checkout from './pages/Checkout'
+import SeguimientoTaller from './pages/SeguimientoTaller'
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
           <Route path="/servicios" element={<Servicios />} />
           <Route path="/citas" element={<Citas />} />
           <Route path="/aprobacion/:ordenId" element={<VistaAprobacionCliente />} />
+          <Route path="/seguimiento/:ordenId" element={<SeguimientoTaller />} />
 
           {/* 2. Acoplamos la ruta para la Recepción de Vehículos */}
           <Route path="/recepcion" element={<RecepcionVehiculo />} />
