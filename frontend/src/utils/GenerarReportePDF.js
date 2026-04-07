@@ -1,24 +1,31 @@
 import jsPDF from 'jspdf';
 
-const BASE_URL = 'http://localhost:4000';
-const EVIDENCIAS_URL = `${BASE_URL}/uploads/evidencias`;
-const GESTION_URL = `${BASE_URL}/uploads/gestion`;
-const LAVADO_URL = `${BASE_URL}/uploads/lavado`;
-const ORDENES_URL = `${BASE_URL}/uploads/ordenes`;
+// ☁️ CONFIGURACIÓN DE RUTAS DE GOOGLE CLOUD STORAGE
+const CLOUD_BASE = 'https://storage.googleapis.com/taller-dr-motors-storage/gestion-taller-node';
+const URL_RECEPCION = `${CLOUD_BASE}/recepcion`;
+const URL_INSPECCION = `${CLOUD_BASE}/inspeccion`;
+const URL_LAVADO = `${CLOUD_BASE}/lavado`;
+const URL_EVIDENCIAS = `${CLOUD_BASE}/evidencias`;
+const URL_HALLAZGOS = `${CLOUD_BASE}/hallazgos`;
 
 const imageToBase64 = (url) => {
     return new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // 🛡️ CRUCIAL: Esto permite que Canvas lea la imagen desde el dominio de Google
+        img.crossOrigin = 'anonymous'; 
         img.onload = () => {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
+            // Comprimimos un poco más el PDF bajando calidad a 0.6
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
-        img.onerror = () => resolve(null);
+        img.onerror = (err) => {
+            console.error("❌ Error cargando imagen para PDF:", url, err);
+            resolve(null);
+        };
         img.src = url;
     });
 };
@@ -28,7 +35,7 @@ export const generarReportePDF = async (orden) => {
     const W = 210;
     let y = 0;
 
-    // --- PALETA DE COLORES ---
+    // --- COLORES CORPORATIVOS DR. MOTORS ---
     const AZUL_OSCURO = [30, 41, 59];
     const AZUL = [37, 99, 235];
     const VERDE = [22, 163, 74];
@@ -36,7 +43,6 @@ export const generarReportePDF = async (orden) => {
     const AMARILLO = [202, 138, 4];
     const BLANCO = [255, 255, 255];
 
-    // --- HELPERS ---
     const saltoSeguro = (alto = 10) => {
         if (y + alto > 275) {
             doc.addPage();
@@ -68,7 +74,7 @@ export const generarReportePDF = async (orden) => {
     doc.text('DR. MOTORS', 14, 18);
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 180);
-    doc.text('REPORTE TÉCNICO INTEGRAL DE SERVICIO', 14, 26);
+    doc.text('REPORTE TÉCNICO DIGITAL - IPS GLOBAL', 14, 26);
     
     doc.setTextColor(255, 255, 255);
     doc.text(`ORDEN: ${orden.id?.slice(-8).toUpperCase()}`, W - 14, 18, { align: 'right' });
@@ -92,7 +98,7 @@ export const generarReportePDF = async (orden) => {
     doc.text(`${orden.kilometraje?.toLocaleString()} KM | ${orden.nivelCombustible}`, 150, y + 12);
     y += 35;
 
-    // ─── 3. INVENTARIO DE RECEPCIÓN ─────────────────────────
+    // ─── 3. INVENTARIO ──────────────────────────────────────
     dibujarTituloSeccion('Inventario de Recepción');
     const inventario = orden.inventario || [];
     const colW = (W - 28) / 2;
@@ -103,39 +109,27 @@ export const generarReportePDF = async (orden) => {
         const px = 14 + (col * colW);
         const py = y + (Math.floor(i / 2) * 7);
         saltoSeguro(7);
-        
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(50, 50, 50);
         doc.text(`• ${item.nombre}`, px + 2, py);
-        
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...(item.estado ? VERDE : ROJO));
         doc.text(item.estado ? '[OK]' : '[NO]', px + colW - 12, py);
     });
     y += (Math.ceil(inventario.length / 2) * 7) + 10;
 
-    // ─── 4. FOTOS DE REGISTRO (INGRESO) ──────────────────────
-    const llaveFotos = Object.keys(orden).find(key => 
-        Array.isArray(orden[key]) && 
-        orden[key].length > 0 && 
-        typeof orden[key][0] === 'string' && // ✅ ESTA ES LA LÍNEA CLAVE
-        orden[key][0].startsWith('FOTO-')
-    );
-    
-    const fotosRegistro = orden.ordentrabajo || orden.fotos || [];
-
+    // ─── 4. FOTOS DE REGISTRO (RECEPCIÓN EN NUBE) ──────────
+    const fotosRegistro = Array.isArray(orden.fotos) ? orden.fotos : [];
     if (fotosRegistro.length > 0) {
-        dibujarTituloSeccion('Fotos de Registro de Ingreso');
+        dibujarTituloSeccion('Registro Fotográfico de Ingreso');
         const fW = 58;
         const fH = 40;
         let col = 0;
         for (const f of fotosRegistro) {
-            // Solo intentamos procesar si es un string (nombre de archivo)
-            if (typeof f !== 'string') continue;
-
             if (col === 3) { col = 0; y += fH + 5; }
             saltoSeguro(fH + 5);
-            const b64 = await imageToBase64(`${ORDENES_URL}/${f}`);
+            // 🚀 URL de Recepción
+            const b64 = await imageToBase64(`${URL_RECEPCION}/${f}`);
             if (b64) {
                 doc.addImage(b64, 'JPEG', 14 + (col * (fW + 4)), y, fW, fH);
                 col++;
@@ -144,10 +138,9 @@ export const generarReportePDF = async (orden) => {
         y += fH + 15;
     }
 
-    // ─── 5. INSPECCIÓN TÉCNICA DETALLADA ─────────────────────
-    doc.addPage(); 
-    y = 20;
-    dibujarTituloSeccion('Inspección Técnica Detallada');
+    // ─── 5. INSPECCIÓN TÉCNICA (INSPECCION EN NUBE) ─────────
+    doc.addPage(); y = 20;
+    dibujarTituloSeccion('Detalle de Inspección Técnica');
     const inspeccionData = typeof orden.inspeccionTecnica === 'string' 
         ? JSON.parse(orden.inspeccionTecnica) 
         : (orden.inspeccionTecnica || {});
@@ -157,94 +150,82 @@ export const generarReportePDF = async (orden) => {
         doc.setFillColor(...AZUL_OSCURO);
         doc.roundedRect(14, y, W - 28, 8, 1, 1, 'F');
         doc.setTextColor(...BLANCO);
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.text(`SISTEMA: ${sector.toUpperCase()}`, 18, y + 5.5);
         y += 12;
 
         const tareas = data.tareas || [];
-        const cardW = 43;
-        const cardH = 45;
         let col = 0;
-
         for (const t of tareas) {
-            if (col === 4) { col = 0; y += cardH + 5; }
-            saltoSeguro(cardH + 10);
-            const px = 14 + (col * (cardW + 3));
-
-            doc.setDrawColor(230);
-            doc.roundedRect(px, y, cardW, cardH, 2, 2, 'D');
-
-            doc.setFontSize(6.5);
+            if (col === 4) { col = 0; y += 50; }
+            saltoSeguro(50);
+            const px = 14 + (col * 46);
+            
+            doc.setDrawColor(240);
+            doc.roundedRect(px, y, 43, 45, 2, 2, 'D');
+            doc.setFontSize(6);
             doc.setTextColor(50, 50, 50);
-            doc.text(t.tarea.substring(0, 25).toUpperCase(), px + 2, y + 5);
-
-            let bCol = (t.estado === 'OK') ? VERDE : (t.estado === 'REGULAR' ? AMARILLO : ROJO);
-            doc.setFillColor(...bCol);
-            doc.roundedRect(px + cardW - 12, y + 2, 10, 4, 1, 1, 'F');
-            doc.setTextColor(...BLANCO);
-            doc.setFontSize(5);
-            doc.text(t.estado, px + cardW - 7, y + 4.8, { align: 'center' });
+            doc.text(t.tarea.substring(0, 30).toUpperCase(), px + 2, y + 5);
 
             if (t.foto) {
-                const b64 = await imageToBase64(`${GESTION_URL}/${t.foto}`);
-                if (b64) doc.addImage(b64, 'JPEG', px + 2, y + 8, cardW - 4, 32);
-            } else {
-                doc.setFillColor(245);
-                doc.rect(px + 2, y + 8, cardW - 4, 32, 'F');
-                doc.setTextColor(180);
-                doc.text('SIN IMAGEN', px + cardW / 2, y + 25, { align: 'center' });
+                // 🚀 URL de Inspección
+                const b64 = await imageToBase64(`${URL_INSPECCION}/${t.foto}`);
+                if (b64) doc.addImage(b64, 'JPEG', px + 2, y + 8, 39, 34);
             }
             col++;
         }
-        y += cardH + 10;
+        y += 55;
     }
 
-    // ─── 6. HALLAZGOS Y EVIDENCIAS ──────────────────────────
+    // ─── 6. EVIDENCIAS DE TRABAJO (EVIDENCIAS/HALLAZGOS) ────
     if (orden.hallazgos?.length > 0) {
-        doc.addPage();
-        y = 20;
-        dibujarTituloSeccion('Evidencias del Trabajo Realizado');
+        doc.addPage(); y = 20;
+        dibujarTituloSeccion('Evidencias de Trabajo Realizado');
         for (const h of orden.hallazgos) {
-            saltoSeguro(55);
-            const imgPath = h.fotoInstalacion || h.foto;
-            if (imgPath) {
-                const b64 = await imageToBase64(`${EVIDENCIAS_URL}/${imgPath}`);
-                if (b64) doc.addImage(b64, 'JPEG', 14, y, 65, 45);
-            }
+            saltoSeguro(60);
+            
+            // Lógica de URL Dinámica
+            const urlImg = h.fotoInstalacion 
+                ? `${URL_EVIDENCIAS}/${h.fotoInstalacion}` 
+                : `${URL_HALLAZGOS}/${h.foto}`;
+
+            const b64 = await imageToBase64(urlImg);
+            if (b64) doc.addImage(b64, 'JPEG', 14, y, 70, 50);
+
             doc.setFontSize(10);
             doc.setTextColor(...AZUL_OSCURO);
-            doc.text(h.puntoFalla.toUpperCase(), 85, y + 5);
+            doc.text(h.puntoFalla.toUpperCase(), 90, y + 5);
             doc.setFontSize(8);
             doc.setTextColor(100, 100, 100);
-            const desc = doc.splitTextToSize(h.descripcion || 'Reparación efectuada.', 105);
-            doc.text(desc, 85, y + 12);
-            y += 55;
+            const desc = doc.splitTextToSize(h.descripcion || 'Servicio completado.', 100);
+            doc.text(desc, 90, y + 12);
+            y += 60;
         }
     }
 
-    // ─── 7. CONTROL DE LAVADO FINAL ─────────────────────────
+    // ─── 7. LAVADO FINAL ───────────────────────────────────
     if (orden.cita?.lavado?.fotoFinal) {
-        doc.addPage();
-        y = 20;
-        dibujarTituloSeccion('Control de Entrega y Lavado', VERDE);
-        const b64Lavado = await imageToBase64(`${LAVADO_URL}/${orden.cita.lavado.fotoFinal}`);
+        doc.addPage(); y = 20;
+        dibujarTituloSeccion('Control de Calidad y Entrega', VERDE);
+        // 🚀 URL de Lavado
+        const b64Lavado = await imageToBase64(`${URL_LAVADO}/${orden.cita.lavado.fotoFinal}`);
         if (b64Lavado) {
-            doc.addImage(b64Lavado, 'JPEG', 14, y, W - 28, 80);
-            y += 85;
+            doc.addImage(b64Lavado, 'JPEG', 14, y, W - 28, 90);
+            y += 95;
         }
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(...VERDE);
-        doc.text('VIGILANCIA DE CALIDAD: Vehículo inspeccionado y listo para entrega.', 14, y);
+        doc.text('ESTADO FINAL: VEHÍCULO LISTO PARA ENTREGA', W / 2, y, { align: 'center' });
     }
 
-    // --- FOOTER ---
+    // --- PIE DE PÁGINA ---
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text(`DR. MOTORS - Reporte de Servicio Digital - Página ${i} de ${totalPages}`, W / 2, 290, { align: 'center' });
+        doc.text(`DR. MOTORS - Página ${i} de ${totalPages} - Reporte Generado Digitalmente`, W / 2, 290, { align: 'center' });
     }
 
-    doc.save(`REPORTE_DR_MOTORS_${orden.cita?.vehiculo?.placa || 'REPORTE'}.pdf`);
+    doc.save(`REPORTE_${orden.cita?.vehiculo?.placa || 'DRMOTORS'}.pdf`);
 };

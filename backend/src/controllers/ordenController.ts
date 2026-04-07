@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs';
+import { Storage } from '@google-cloud/storage'; // 👈 Cambiamos fs/path por Storage
 
 const prisma = new PrismaClient();
+const storage = new Storage(); // Google buscará tus credenciales automáticamente
+const BUCKET_NAME = 'taller-dr-motors-storage';
 
 export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
   try {
@@ -13,22 +14,33 @@ export const crearOrdenDesdeRecepcion = async (req: Request, res: Response) => {
       inventario, observaciones, gradoAceite, marcaAceiteSugerida 
     } = req.body;
 
-    // 📸 [PROCESAMIENTO DE IMÁGENES] - Tu lógica de Sharp está excelente
+    // 📸 [IMÁGENES PARA CLOUD STORAGE]
     const files = req.files as Express.Multer.File[];
     const nombresFotos: string[] = [];
-    const directory = 'uploads/ordenes/';
-    if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
 
     if (files && files.length > 0) {
       await Promise.all(
         files.map(async (file) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           const nombreArchivo = `FOTO-${uniqueSuffix}.jpg`;
-          const rutaFinal = path.join(directory, nombreArchivo);
-          await sharp(file.buffer)
-            .rotate().resize(1200, null, { withoutEnlargement: true })
-            .toFormat('jpeg').jpeg({ quality: 70, progressive: true })
-            .toFile(rutaFinal);
+          
+          // 1. Procesamos con Sharp para obtener el BUFFER
+          const bufferProcesado = await sharp(file.buffer)
+            .rotate()
+            .resize(1200, null, { withoutEnlargement: true })
+            .toFormat('jpeg')
+            .jpeg({ quality: 70, progressive: true })
+            .toBuffer(); 
+
+          // 2. Ruta exacta: gestion-taller-node/recepcion/
+          await storage.bucket(BUCKET_NAME)
+            .file(`gestion-taller-node/recepcion/${nombreArchivo}`)
+            .save(bufferProcesado, {
+              contentType: 'image/jpeg',
+              resumable: false,
+              metadata: { cacheControl: 'public, max-age=31536000' }
+            });
+
           nombresFotos.push(nombreArchivo);
         })
       );

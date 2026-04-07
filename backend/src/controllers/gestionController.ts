@@ -1,12 +1,15 @@
 import { Request, Response } from 'express';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
+import { Storage } from '@google-cloud/storage';
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 
 const prisma = new PrismaClient();
+const storage = new Storage();
+const BUCKET_NAME = 'taller-dr-motors-storage';
 
 if (ffmpegPath) {
     ffmpeg.setFfmpegPath(ffmpegPath);
@@ -81,86 +84,79 @@ export const getGestionOrden = async (req: Request, res: Response) => {
 
 export const updateInspeccionTecnica = async (req: Request, res: Response) => {
     const { ordenId } = req.params;
-
     try {
-        console.log("--- 🛠️ INICIO DE SINCRONIZACIÓN ---");
-        
         if (!req.body.inspeccion) throw new Error("Datos de inspección no recibidos");
 
-        // 1. 🔍 BUSCAR DATOS PREVIOS (Para el flag y datos de WhatsApp)
         const ordenPrevia = await prisma.ordenTrabajo.findUnique({
             where: { id: ordenId },
-            include: {
-                cita: {
-                    include: {
-                        vehiculo: {
-                            include: { cliente: true }
-                        }
-                    }
-                }
-            }
+            include: { cita: { include: { vehiculo: { include: { cliente: true } } } } }
         });
 
         if (!ordenPrevia) return res.status(404).json({ error: "Orden no encontrada" });
 
         const inspeccion = JSON.parse(req.body.inspeccion);
         const archivos = req.files as Express.Multer.File[] || [];
-        const directory = 'uploads/gestion/';
 
-        if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
+        // ✅ NO necesitamos crear carpetas locales (directory/mkdirSync borrados)
 
-        // 📸 PROCESAR ARCHIVOS (Tu lógica actual)
         for (const file of archivos) {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             
+            // 📸 PROCESAR FOTOS
             if (file.fieldname.startsWith('foto_')) {
                 const [, sectorKey, pointId] = file.fieldname.split('_');
-                if (!inspeccion[sectorKey]) continue;
-
                 const nombreArchivo = `INS-${uniqueSuffix}.jpg`;
-                await sharp(file.buffer)
-                    .rotate()
-                    .resize(1200)
-                    .jpeg({ quality: 70 })
-                    .toFile(path.join(directory, nombreArchivo));
+
+                const buffer = await sharp(file.buffer)
+                    .rotate().resize(1200).jpeg({ quality: 70 }).toBuffer();
+
+                await storage.bucket(BUCKET_NAME)
+                    .file(`gestion-taller-node/inspeccion/${nombreArchivo}`)
+                    .save(buffer, { contentType: 'image/jpeg' });
 
                 const punto = inspeccion[sectorKey].tareas.find((t: any) => t.id === Number(pointId));
                 if (punto) punto.foto = nombreArchivo;
             }
 
+            // 🎥 PROCESAR VIDEOS
             if (file.fieldname.startsWith('video_')) {
                 const sectorKey = file.fieldname.split('_')[1];
-                if (!inspeccion[sectorKey]) continue;
-
                 const nombreVideo = `VID-${uniqueSuffix}.mp4`;
-                const rutaTemporal = path.join(directory, `temp-${nombreVideo}`);
-                const rutaFinal = path.join(directory, nombreVideo);
+                
+                // Usamos la carpeta temporal raíz del backend
+                const tempInput = path.join(__dirname, `../../temp-in-${uniqueSuffix}.mp4`);
+                const tempOutput = path.join(__dirname, `../../temp-out-${uniqueSuffix}.mp4`);
 
-                fs.writeFileSync(rutaTemporal, file.buffer);
+                fs.writeFileSync(tempInput, file.buffer);
 
-                try {
-                    console.log(`⏳ Comprimiendo video: ${sectorKey}`);
-                    await new Promise<void>((resolve, reject) => {
-                        ffmpeg(rutaTemporal)
-                            .outputOptions(['-vcodec libx264', '-crf 28', '-preset superfast', '-movflags +faststart'])
-                            .size('720x?') 
-                            .on('end', () => {
-                                if (fs.existsSync(rutaTemporal)) fs.unlinkSync(rutaTemporal);
-                                resolve();
-                            })
-                            .on('error', (err) => reject(err))
-                            .save(rutaFinal);
-                    });
-                    inspeccion[sectorKey].video = nombreVideo;
-                } catch (error) {
-                    console.error("⚠️ Falló compresión, usando original");
-                    if (fs.existsSync(rutaTemporal)) fs.renameSync(rutaTemporal, rutaFinal);
-                    inspeccion[sectorKey].video = nombreVideo;
-                }
+                await new Promise<void>((resolve, reject) => {
+                    ffmpeg(tempInput)
+                        .outputOptions(['-vcodec libx264', '-crf 28', '-preset superfast', '-movflags +faststart'])
+                        .size('720x?')
+                        .on('end', async () => {
+                            // Subimos el video procesado
+                            await storage.bucket(BUCKET_NAME).upload(tempOutput, {
+                                destination: `gestion-taller-node/inspeccion/${nombreVideo}`,
+                                contentType: 'video/mp4'
+                            });
+                            // Limpieza total de temporales
+                            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+                            if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+                            resolve();
+                        })
+                        .on('error', (err) => {
+                            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+                            if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+                            reject(err);
+                        })
+                        .save(tempOutput);
+                });
+
+                inspeccion[sectorKey].video = nombreVideo;
             }
         }
 
-        // 📈 RECALCULAR PROGRESO
+        // 📈 RECALCULAR PROGRESO (Tu lógica impecable)
         let totalPuntos = 0;
         let completados = 0;
         Object.values(inspeccion).forEach((sec: any) => {
@@ -174,7 +170,7 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
 
         const progresoFinal = totalPuntos > 0 ? Math.round((completados / totalPuntos) * 100) : 0;
 
-        // 💾 2. ACTUALIZAR INSPECCIÓN EN LA BASE DE DATOS
+        // 💾 ACTUALIZAR DB
         const ordenActualizada = await prisma.ordenTrabajo.update({
             where: { id: ordenId },
             data: {
@@ -184,38 +180,19 @@ export const updateInspeccionTecnica = async (req: Request, res: Response) => {
             }
         });
 
-        // 🎯 3. DISPARADOR DE NOTIFICACIÓN ÚNICA (Solo si no se ha notificado antes)
-        let notificacionEnviada = false;
-
+        // 📱 NOTIFICACIÓN WHATSAPP (Solo una vez)
         if (!ordenPrevia.notificadoSeguimiento) {
-            const cliente = ordenPrevia.cita.vehiculo.cliente;
-            const placa = ordenPrevia.cita.vehiculoPlaca;
-            // El link usa el CUID de la orden directamente
-            const linkSeguimiento = `http://localhost:5173/seguimiento/${ordenId}`;
-
-            console.log("-----------------------------------------");
-            console.log(`📱 ENVIANDO WSP A: ${cliente.nombres} (${cliente.telefono})`);
-            console.log(`✅ MENSAJE: Hola ${cliente.nombres}, el servicio para su vehículo ${placa} ha iniciado. Siga el avance en vivo aquí: ${linkSeguimiento}`);
-            console.log("-----------------------------------------");
-
-            // ACTUALIZAR FLAG EN BASE DE DATOS (Para que sea 1 / true)
+            console.log(`📱 SIMULACIÓN WSP ENVIADA A: ${ordenPrevia.cita.vehiculo.cliente.nombres}`);
             await prisma.ordenTrabajo.update({
                 where: { id: ordenId },
                 data: { notificadoSeguimiento: true }
             });
-
-            notificacionEnviada = true;
         }
 
-        console.log(`✅ Éxito. Progreso final: ${progresoFinal}%`);
-        res.json({ 
-            message: "Sincronizado", 
-            ordenActualizada,
-            notificacionEnviada 
-        });
+        res.json({ message: "Sincronizado con Google Cloud", ordenActualizada });
 
     } catch (error: any) {
-        console.error("--- ❌ ERROR ---", error.message);
+        console.error("❌ ERROR:", error.message);
         res.status(500).json({ error: error.message });
     }
 };
@@ -227,14 +204,29 @@ export const crearHallazgoIndependiente = async (req: Request, res: Response) =>
 
     try {
         let nombreFoto = null;
+
         if (file) {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             nombreFoto = `HAL-${uniqueSuffix}.jpg`;
-            await sharp(file.buffer)
-                .rotate().resize(1200).jpeg({ quality: 70 })
-                .toFile(path.join('uploads/gestion/', nombreFoto));
+
+            // 1. 📸 Procesamos el buffer con Sharp (en memoria)
+            const bufferProcesado = await sharp(file.buffer)
+                .rotate()
+                .resize(1200, null, { withoutEnlargement: true })
+                .jpeg({ quality: 70 })
+                .toBuffer();
+
+            // 2. ☁️ Subida directa a la carpeta 'hallazgos' en Google Cloud
+            await storage.bucket(BUCKET_NAME)
+                .file(`gestion-taller-node/hallazgos/${nombreFoto}`) 
+                .save(bufferProcesado, {
+                    contentType: 'image/jpeg',
+                    resumable: false,
+                    metadata: { cacheControl: 'public, max-age=31536000' }
+                });
         }
 
+        // 3. 💾 Guardamos en la base de datos con Prisma
         const nuevoHallazgo = await prisma.hallazgo.create({
             data: {
                 ordenId,
@@ -244,14 +236,16 @@ export const crearHallazgoIndependiente = async (req: Request, res: Response) =>
                 cantidad: Number(cantidad),
                 precioVenta: Number(precioVenta),
                 total: Number(cantidad) * Number(precioVenta),
-                foto: nombreFoto,
+                foto: nombreFoto, // Guardamos solo el nombre del archivo
                 estado: "POR ENVIAR"
             },
             include: { costoMaestro: true }
         });
 
         res.json(nuevoHallazgo);
-    } catch (error) {
+
+    } catch (error: any) {
+        console.error("❌ Error al crear hallazgo en la nube:", error.message);
         res.status(500).json({ error: "Error al crear hallazgo" });
     }
 };
@@ -362,37 +356,46 @@ export const responderHallazgo = async (req: Request, res: Response) => {
 
 export const subirEvidenciaInstalacion = async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
+        const { id } = req.params; // El ID del hallazgo
         const file = req.file;
 
-        if (!file) return res.status(400).json({ error: "No se recibió imagen" });
+        if (!file) return res.status(400).json({ error: "No se recibió imagen de evidencia" });
 
-        // 📂 Carpeta dedicada: backend/uploads/evidencias/
-        const directory = 'uploads/evidencias/';
-        if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
-
+        // 1. 🏷️ Generamos el nombre único para la nube
         const nombreArchivo = `INSTALACION-${Date.now()}-${id}.jpg`;
-        const rutaFinal = path.join(directory, nombreArchivo);
 
-        // 📸 Procesamos con Sharp para que no rompa el disco
-        await sharp(file.buffer)
-            .resize(1000, null, { withoutEnlargement: true })
+        // 2. 📸 Procesamos con Sharp para obtener el BUFFER (en memoria)
+        const bufferProcesado = await sharp(file.buffer)
+            .resize(1000, null, { withoutEnlargement: true }) // Redimensionamos para que cargue rápido
             .toFormat('jpeg')
             .jpeg({ quality: 70 })
-            .toFile(rutaFinal);
+            .toBuffer();
 
-        // 🎯 Actualizamos en la DB
+        // 3. ☁️ Subida directa a la carpeta 'evidencias' en Google Cloud
+        await storage.bucket(BUCKET_NAME)
+            .file(`gestion-taller-node/evidencias/${nombreArchivo}`)
+            .save(bufferProcesado, {
+                contentType: 'image/jpeg',
+                resumable: false,
+                metadata: { cacheControl: 'public, max-age=31536000' }
+            });
+
+        // 4. 🎯 Actualizamos en la DB con Prisma
         const hallazgo = await prisma.hallazgo.update({
             where: { id: id },
             data: { 
-                fotoInstalacion: nombreArchivo,
-                estado: 'INSTALADO' // 👈 Pasa de RECIBIDO a INSTALADO automáticamente
+                fotoInstalacion: nombreArchivo, // Guardamos solo el nombre del archivo
+                estado: 'INSTALADO' // El repuesto pasa a estar instalado automáticamente
             }
         });
 
-        res.json(hallazgo);
+        res.json({
+            message: "Evidencia de instalación subida a la nube correctamente",
+            hallazgo
+        });
+
     } catch (error: any) {
-        console.error("❌ Error evidencia:", error);
+        console.error("❌ Error al subir evidencia a la nube:", error.message);
         res.status(500).json({ error: error.message });
     }
 };

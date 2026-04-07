@@ -6,6 +6,8 @@ import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+const CLOUD_STORAGE_EVIDENCIAS = "https://storage.googleapis.com/taller-dr-motors-storage/gestion-taller-node/evidencias";
+
 // 🧊 Función para adelgazar las fotos (Canvas)
 const comprimirImagen = (archivo) => {
     return new Promise((resolve) => {
@@ -699,13 +701,15 @@ const GestionTaller = () => {
                                         {/* Imagen de la Card */}
                                         <div className="relative aspect-video overflow-hidden bg-slate-100">
                                             <img 
-                                                // 🚀 CAMBIO: Usamos la ruta directa o el formato de Vite
-                                                src={`http://localhost:4000/uploads/evidencias/${h.fotoInstalacion}`} 
-                                                alt="Evidencia"
+                                                // 🚀 CAMBIO: Ahora obtenemos de Google Cloud Storage
+                                                src={`${CLOUD_STORAGE_EVIDENCIAS}/${h.fotoInstalacion}`} 
+                                                alt="Evidencia de Instalación"
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                // 🛠️ Tip: Si la imagen no carga en la nube, muestra un placeholder
+                                                onError={(e) => { e.target.src = "https://via.placeholder.com/400x225?text=Imagen+no+disponible"; }}
                                             />
                                             <span className="absolute top-3 left-3 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-lg shadow-lg uppercase tracking-widest">
-                                                Nuevo
+                                                Instalado
                                             </span>
                                         </div>
 

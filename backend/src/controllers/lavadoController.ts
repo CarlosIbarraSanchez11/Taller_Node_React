@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
-import path from 'path';
-import fs from 'fs';
+import { Storage } from '@google-cloud/storage';
 
 const prisma = new PrismaClient();
+const storage = new Storage();
+const BUCKET_NAME = 'taller-dr-motors-storage';
 
 export const getCitaParaLavado = async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -15,7 +16,7 @@ export const getCitaParaLavado = async (req: Request, res: Response) => {
                 vehiculo: true,
                 ordenTrabajo: {
                     select: {
-                        fotos: true, // Para mostrar cómo llegó el carro
+                        fotos: true, // Recuerda que en el Front esto ya apunta a la carpeta /recepcion
                         observaciones: true
                     }
                 }
@@ -30,50 +31,52 @@ export const getCitaParaLavado = async (req: Request, res: Response) => {
 };
 
 export const finalizarLavado = async (req: Request, res: Response) => {
-    const { id } = req.params; // Este es el id de la cita
-    const { checklist } = req.body; // Viene como string desde el FormData
+    const { id } = req.params; // ID de la cita
+    const { checklist } = req.body; 
     const file = req.file;
 
     if (!file) return res.status(400).json({ error: "La foto de lavado es obligatoria" });
 
-    // 1. Definimos nombre y ruta de la foto
+    // 1. 🏷️ Generamos el nombre del archivo
     const nombreArchivo = `LAVADO-${id}-${Date.now()}.jpg`;
-    const rutaCarpeta = path.join(__dirname, '../../uploads/lavado');
-    const rutaFinal = path.join(rutaCarpeta, nombreArchivo);
-
-    // Aseguramos que la carpeta existe (por si acaso)
-    if (!fs.existsSync(rutaCarpeta)) {
-        fs.mkdirSync(rutaCarpeta, { recursive: true });
-    }
 
     try {
-        // 2. Procesamos con Sharp (Compresión Pro)
-        await sharp(file.buffer)
-            .resize(1000) // Máximo 1000px de ancho
-            .jpeg({ quality: 70 }) // Calidad para que pese esos ~80kb
-            .toFile(rutaFinal);
+        // 2. 📸 Procesamos con Sharp para obtener el BUFFER (RAM)
+        const bufferProcesado = await sharp(file.buffer)
+            .resize(1000, null, { withoutEnlargement: true })
+            .jpeg({ quality: 70 })
+            .toBuffer();
 
-        // 3. Transacción en la DB: Creamos el registro de Lavado y actualizamos la Cita
+        // 3. ☁️ Subida directa a la carpeta 'lavado' en Google Cloud
+        await storage.bucket(BUCKET_NAME)
+            .file(`gestion-taller-node/lavado/${nombreArchivo}`)
+            .save(bufferProcesado, {
+                contentType: 'image/jpeg',
+                resumable: false,
+                metadata: { cacheControl: 'public, max-age=31536000' }
+            });
+
+        // 4. ⛓️ Transacción en la DB (Tu lógica se mantiene intacta)
         await prisma.$transaction([
-            // Creamos el registro en la tabla Lavado
+            // Creamos el registro de Lavado
             prisma.lavado.create({
                 data: {
                     citaId: id,
                     fotoFinal: nombreArchivo,
-                    checklist: JSON.parse(checklist) // Convertimos el string de vuelta a JSON
+                    checklist: typeof checklist === 'string' ? JSON.parse(checklist) : checklist
                 }
             }),
-            // Cambiamos el estado de la cita
+            // Actualizamos el estado de la cita
             prisma.cita.update({
                 where: { id: id },
-                data: { estado: 'POR ENTREGAR' } // <--- Antes decía 'LISTO PARA ENTREGA'
+                data: { estado: 'POR ENTREGAR' } 
             })
         ]);
 
         res.json({ message: "¡Vehículo lavado y listo para entrega! ✨" });
 
-    } catch (error) {
-        console.error("❌ Error al finalizar lavado:", error);
+    } catch (error: any) {
+        console.error("❌ Error al finalizar lavado en la nube:", error.message);
         res.status(500).json({ error: "No se pudo procesar el final del lavado." });
     }
 };

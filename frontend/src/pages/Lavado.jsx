@@ -4,6 +4,8 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import Layout from '../components/layout/Layout';
 
+const CLOUD_RECEPCION = "https://storage.googleapis.com/taller-dr-motors-storage/gestion-taller-node/recepcion";
+
 // 🧊 Tu función mágica de compresión (Mantenla siempre a mano)
 const comprimirImagen = (archivo) => {
     return new Promise((resolve) => {
@@ -113,10 +115,16 @@ const Lavado = () => {
                             <hr className="my-6 border-dashed" />
                             
                             <h4 className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest">Foto de recepción (Referencia)</h4>
-                            {/* Mostramos las fotos que se tomaron al entrar al taller */}
                             <div className="grid grid-cols-2 gap-2">
                                 {datos?.ordenTrabajo?.fotos?.map((f, i) => (
-                                    <img key={i} src={`http://localhost:4000/uploads/ordenes/${f}`} className="rounded-xl border border-gray-100 shadow-sm aspect-square object-cover" alt="Referencia" />
+                                    <img 
+                                        key={i} 
+                                        // 🚀 CAMBIO: Ahora apuntamos a la carpeta /recepcion en la nube
+                                        src={`${CLOUD_RECEPCION}/${f}`} 
+                                        className="rounded-xl border border-gray-100 shadow-sm aspect-square object-cover" 
+                                        alt="Referencia Recepción" 
+                                        onError={(e) => { e.target.src = "https://via.placeholder.com/150?text=Sin+Foto"; }}
+                                    />
                                 ))}
                             </div>
                             <p className="text-[9px] text-gray-300 italic text-center mt-3">Así llegó el vehículo al taller.</p>
