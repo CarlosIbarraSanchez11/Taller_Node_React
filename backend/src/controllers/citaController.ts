@@ -157,3 +157,44 @@ export const getCitaById = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error al obtener el detalle de la cita" });
   }
 };
+
+export const cancelarCita = async (req: Request, res: Response) => {
+    const { id } = req.params; // ID de la cita
+
+    try {
+        await prisma.$transaction([
+            // 1. Cancelamos la Cita
+            prisma.cita.update({
+                where: { id: id },
+                data: { estado: 'CANCELADO' }
+            }),
+            prisma.ordenTrabajo.updateMany({
+                where: { citaId: id },
+                data: { estado: 'CANCELADO' }
+            })
+        ]);
+
+        return res.json({ message: "Cita y Orden canceladas correctamente." });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Actualizar una cita (Para archivar o cambiar estados genéricos)
+export const updateCita = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params; // El ID "cmnmqqfxk..."
+        const { estado } = req.body; // El nuevo estado: "ARCHIVADO"
+
+        const citaActualizada = await prisma.cita.update({
+            where: { id: id },
+            data: { estado: estado },
+        });
+
+        console.log(`✅ Cita ${id} actualizada a: ${estado}`);
+        res.json(citaActualizada);
+    } catch (error) {
+        console.error("Error al actualizar cita:", error);
+        res.status(500).json({ error: "No se pudo actualizar la cita" });
+    }
+};

@@ -80,12 +80,14 @@ const Checkout = () => {
           <button onClick={() => generarReportePDF(orden)} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 text-sm font-bold">
             <FileText size={18} className="mr-2" /> Reporte
           </button>
-          <button 
+          {orden.estado !== 'FINALIZADO' && (
+            <button 
               onClick={handleEntregarVehiculo}
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700 text-sm font-bold transition-transform active:scale-95"
-          >
+            >
               <CheckCircle size={18} className="mr-2" /> Entregar Vehículo
-          </button>
+            </button>
+          )}
         </div>
       </div>
 
